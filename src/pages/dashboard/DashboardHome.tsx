@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
-import { MessageCircle, BookOpen, Sun, Flame } from 'lucide-react';
+import { MessageCircle, BookOpen, Sun, Flame, ChevronRight, Sparkles } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { trackEvent } from '../../lib/analytics';
 
@@ -14,6 +14,7 @@ export default function DashboardHome() {
   const [streakDays, setStreakDays] = useState(0);
   const [loadingData, setLoadingData] = useState(true);
   const [prayedToday, setPrayedToday] = useState(false);
+  const [verseOfTheDay, setVerseOfTheDay] = useState<{ text: string; ref: string } | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -33,7 +34,7 @@ export default function DashboardHome() {
     setLoadingData(true);
     const today = new Date().toISOString().split('T')[0];
     try {
-      const [prayersRes, streaksRes] = await Promise.all([
+      const [prayersRes, streaksRes, devotionalRes] = await Promise.all([
         supabase
           .from('prayer_journal_entries')
           .select('id', { count: 'exact', head: true })
@@ -44,17 +45,25 @@ export default function DashboardHome() {
           .eq('user_id', user.id)
           .order('date', { ascending: false })
           .limit(365),
+        supabase
+          .from('daily_devotionals')
+          .select('verse, verse_ref')
+          .eq('date', today)
+          .maybeSingle(),
       ]);
 
       if (prayersRes.error) throw prayersRes.error;
       if (streaksRes.error) throw streaksRes.error;
 
-      // Fetch profile for last_prayer_added_date
+      if (devotionalRes.data) {
+        setVerseOfTheDay({ text: devotionalRes.data.verse, ref: devotionalRes.data.verse_ref });
+      }
+
       const { data: profile } = await supabase
         .from('profiles')
         .select('last_prayer_added_date')
         .eq('id', user.id)
-        .single();
+        .maybeSingle();
 
       if (profile?.last_prayer_added_date === today) {
         setPrayedToday(true);
@@ -99,39 +108,35 @@ export default function DashboardHome() {
   }, [streakDays]);
 
   const stats = [
-    { label: 'Chat Messages', value: '0', icon: MessageCircle, color: 'text-blue-400' },
-    { label: 'Prayers Logged', value: String(prayerCount), icon: BookOpen, color: 'text-emerald-400' },
-    { label: 'Verses Reflected', value: '0', icon: Sun, color: 'text-amber-400' },
-    { label: 'Day Streak', value: String(streakDays), icon: Flame, color: 'text-rose-400' },
+    { label: 'Prayers Logged', value: String(prayerCount), icon: BookOpen, color: 'text-emerald-400', bg: 'bg-emerald-400/10' },
+    { label: 'Day Streak', value: String(streakDays), icon: Flame, color: 'text-amber-400', bg: 'bg-amber-400/10' },
   ];
 
   const quickActions = [
-    { label: 'Start a Bible Chat', path: '/dashboard/bible-chat', icon: MessageCircle, description: 'Ask anything about scripture' },
-    { label: 'Write a Prayer', path: '/dashboard/prayer-journal', icon: BookOpen, description: 'Lift your heart to God' },
-    { label: "Today's Verse", path: '/dashboard/daily-verse', icon: Sun, description: 'Reflect on the Word' },
+    { label: 'Start a Bible Chat', path: '/dashboard/bible-chat', icon: MessageCircle, description: 'Ask anything about scripture', color: 'text-blue-400', bg: 'bg-blue-400/10' },
+    { label: 'Write a Prayer', path: '/dashboard/prayer-journal', icon: BookOpen, description: 'Lift your heart to God', color: 'text-emerald-400', bg: 'bg-emerald-400/10' },
+    { label: "Today's Verse", path: '/dashboard/daily-verse', icon: Sun, description: 'Reflect on the Word', color: 'text-amber-400', bg: 'bg-amber-400/10' },
   ];
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto">
       {/* Greeting */}
-      <div className="mb-8 flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-white flex items-center gap-3">
-            Hello, <span className="text-gold-400">{firstName}</span>
-            {prayedToday && (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-400/10 border border-emerald-400/20 rounded-full text-xs font-bold text-emerald-400 animate-fade-in">
-                Prayed today ✓
-              </span>
-            )}
-          </h1>
-          <p className="mt-1 text-navy-300">Welcome back. How can we grow in faith today?</p>
-        </div>
+      <div className="mb-8 animate-fade-in-up">
+        <h1 className="text-2xl sm:text-3xl font-bold text-white flex items-center gap-3">
+          Hello, <span className="text-gold-400">{firstName}</span>
+          {prayedToday && (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-400/10 border border-emerald-400/20 rounded-full text-xs font-bold text-emerald-400 animate-fade-in">
+              Prayed today
+            </span>
+          )}
+        </h1>
+        <p className="mt-1 text-navy-300">Welcome back. How can we grow in faith today?</p>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 gap-4 mb-8 animate-slide-up-stagger">
         {loadingData
-          ? Array.from({ length: 4 }).map((_, idx) => (
+          ? Array.from({ length: 2 }).map((_, idx) => (
               <div key={idx} className="bg-navy-900/50 border border-navy-800 rounded-xl p-4 sm:p-5 animate-pulse">
                 <div className="w-5 h-5 rounded bg-navy-700 mb-3" />
                 <div className="h-8 w-12 rounded bg-navy-700 mb-2" />
@@ -143,9 +148,11 @@ export default function DashboardHome() {
               return (
                 <div
                   key={stat.label}
-                  className="bg-navy-900/50 border border-navy-800 rounded-xl p-4 sm:p-5"
+                  className="bg-navy-900/50 border border-navy-800 rounded-xl p-4 sm:p-5 hover:border-navy-700 transition-all duration-200"
                 >
-                  <Icon className={`w-5 h-5 ${stat.color} mb-3`} />
+                  <div className={`w-8 h-8 ${stat.bg} rounded-lg flex items-center justify-center mb-3`}>
+                    <Icon className={`w-4 h-4 ${stat.color}`} />
+                  </div>
                   <p className="text-2xl font-bold text-white">{stat.value}</p>
                   <p className="text-xs text-navy-400 mt-0.5">{stat.label}</p>
                 </div>
@@ -156,7 +163,7 @@ export default function DashboardHome() {
       {/* Quick Actions */}
       <div className="mb-8">
         <h2 className="text-lg font-semibold text-white mb-4">Quick Actions</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 animate-slide-up-stagger">
           {loadingData
             ? Array.from({ length: 3 }).map((_, idx) => (
                 <div key={idx} className="bg-navy-900/50 border border-navy-800 rounded-xl p-5 animate-pulse">
@@ -171,10 +178,10 @@ export default function DashboardHome() {
                   <Link
                     key={action.label}
                     to={action.path}
-                    className="group bg-navy-900/50 border border-navy-800 rounded-xl p-5 hover:border-gold-400/30 hover:bg-navy-900/80 transition-all duration-200"
+                    className="group bg-navy-900/50 border border-navy-800 rounded-xl p-5 hover:border-gold-400/30 hover:bg-navy-900/80 hover:-translate-y-0.5 transition-all duration-300"
                   >
-                    <div className="w-10 h-10 bg-gold-400/10 rounded-lg flex items-center justify-center mb-3 group-hover:bg-gold-400/20 transition-colors">
-                      <Icon className="w-5 h-5 text-gold-400" />
+                    <div className={`w-10 h-10 ${action.bg} rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform duration-300`}>
+                      <Icon className={`w-5 h-5 ${action.color}`} />
                     </div>
                     <h3 className="text-sm font-semibold text-white">{action.label}</h3>
                     <p className="text-xs text-navy-400 mt-1">{action.description}</p>
@@ -185,7 +192,7 @@ export default function DashboardHome() {
       </div>
 
       {/* Prayer streak highlight */}
-      <div className="mb-8 bg-navy-900/50 border border-amber-400/20 rounded-2xl p-5 sm:p-6">
+      <div className="mb-8 bg-navy-900/50 border border-amber-400/20 rounded-2xl p-5 sm:p-6 animate-fade-in-up">
         <p className="text-xs font-semibold uppercase tracking-wider text-amber-300 mb-2">
           Prayer Streak
         </p>
@@ -196,25 +203,43 @@ export default function DashboardHome() {
           </div>
         ) : (
           <>
-            <p className="text-2xl font-bold text-white mb-1">🔥 {streakDays} day{streakDays === 1 ? '' : 's'}</p>
+            <p className="text-2xl font-bold text-white mb-1">{streakDays} day{streakDays === 1 ? '' : 's'}</p>
             <p className="text-sm text-navy-300">{streakMessage}</p>
           </>
         )}
       </div>
 
       {/* Verse of the Day Card */}
-      <div className="bg-gradient-to-br from-navy-900 to-navy-900/50 border border-gold-400/20 rounded-2xl p-6 sm:p-8">
-        <p className="text-xs font-medium text-gold-400 uppercase tracking-wider mb-3">Verse of the Day</p>
-        <blockquote className="text-lg sm:text-xl text-white leading-relaxed italic">
-          "For I know the plans I have for you, declares the Lord, plans to prosper you and not to harm you, plans to give you hope and a future."
-        </blockquote>
-        <p className="mt-4 text-sm text-gold-400 font-medium">Jeremiah 29:11</p>
-        <Link
-          to="/dashboard/daily-verse"
-          className="mt-4 inline-flex items-center text-sm text-navy-300 hover:text-white transition-colors"
-        >
-          Write a reflection
-        </Link>
+      <div className="bg-gradient-to-br from-navy-900 to-navy-900/50 border border-gold-400/20 rounded-2xl p-6 sm:p-8 relative overflow-hidden animate-fade-in-up">
+        <div className="absolute top-0 right-0 w-48 h-48 bg-gold-400/5 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+        <div className="relative">
+          <div className="flex items-center gap-2 mb-3">
+            <Sparkles className="w-4 h-4 text-gold-400" />
+            <p className="text-xs font-medium text-gold-400 uppercase tracking-wider">Verse of the Day</p>
+          </div>
+          {verseOfTheDay ? (
+            <>
+              <blockquote className="text-lg sm:text-xl text-white leading-relaxed italic">
+                &ldquo;{verseOfTheDay.text}&rdquo;
+              </blockquote>
+              <p className="mt-4 text-sm text-gold-400 font-medium">{verseOfTheDay.ref}</p>
+            </>
+          ) : (
+            <>
+              <blockquote className="text-lg sm:text-xl text-white leading-relaxed italic">
+                &ldquo;For I know the plans I have for you, declares the Lord, plans to prosper you and not to harm you, plans to give you hope and a future.&rdquo;
+              </blockquote>
+              <p className="mt-4 text-sm text-gold-400 font-medium">Jeremiah 29:11</p>
+            </>
+          )}
+          <Link
+            to="/dashboard/daily-verse"
+            className="mt-4 inline-flex items-center gap-1 text-sm text-navy-300 hover:text-gold-400 transition-colors"
+          >
+            Write a reflection
+            <ChevronRight className="w-4 h-4" />
+          </Link>
+        </div>
       </div>
     </div>
   );

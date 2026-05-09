@@ -6,16 +6,14 @@ import {
   Sun,
   ChevronRight,
   ChevronDown,
-  Quote,
   Check,
   X,
-  Send,
-  Bot,
-  Sparkles,
   Play,
+  ArrowRight,
 } from 'lucide-react';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useInView } from 'react-intersection-observer';
+import { useAuth } from '../context/AuthContext';
 
 const features = [
   {
@@ -67,30 +65,6 @@ const testimonials = [
   }
 ];
 
-function StatCounter({ target, suffix = '', duration = 2000 }: { target: number; suffix?: string; duration?: number }) {
-  const [count, setCount] = useState(0);
-  const { ref, inView } = useInView({ triggerOnce: true });
-
-  useEffect(() => {
-    if (inView) {
-      let startTime: number;
-      const animate = (currentTime: number) => {
-        if (!startTime) startTime = currentTime;
-        const progress = Math.min((currentTime - startTime) / duration, 1);
-        setCount(Math.floor(progress * target));
-        if (progress < 1) requestAnimationFrame(animate);
-      };
-      requestAnimationFrame(animate);
-    }
-  }, [inView, target, duration]);
-
-  return (
-    <span ref={ref} className="tabular-nums">
-      {count.toLocaleString()}{suffix}
-    </span>
-  );
-}
-
 const faqs = [
   {
     question: 'Is BibleAI free to use?',
@@ -126,14 +100,14 @@ function FAQItem({ question, answer }: { question: string; answer: string }) {
           {question}
         </span>
         <ChevronDown
-          className={`w-5 h-5 text-navy-400 flex-shrink-0 transition-transform duration-200 ${
+          className={`w-5 h-5 text-navy-400 flex-shrink-0 transition-transform duration-300 ${
             open ? 'rotate-180' : ''
           }`}
         />
       </button>
       <div
-        className={`overflow-hidden transition-all duration-300 ${
-          open ? 'max-h-48 pb-5' : 'max-h-0'
+        className={`overflow-hidden transition-all duration-300 ease-in-out ${
+          open ? 'max-h-48 pb-5 opacity-100' : 'max-h-0 opacity-0'
         }`}
       >
         <p className="text-sm text-navy-300 leading-relaxed">{answer}</p>
@@ -142,12 +116,12 @@ function FAQItem({ question, answer }: { question: string; answer: string }) {
   );
 }
 
-function DemoChat({ open, onClose }: { open: boolean; onClose: () => void }) {
+function DemoChat({ open, onClose, isLoggedIn }: { open: boolean; onClose: () => void; isLoggedIn: boolean }) {
   const [step, setStep] = useState(0);
   const [messages, setMessages] = useState<Array<{ role: 'user' | 'bot'; text: string }>>([]);
   const [isTyping, setIsTyping] = useState(false);
 
-  const demoScript = [
+  const demoScript: Array<{ role: 'user' | 'bot'; text: string }> = [
     { role: 'user', text: "What does the Bible say about finding peace in hard times?" },
     { role: 'bot', text: "Philippians 4:6-7 says: 'Do not be anxious about anything, but in every situation, by prayer and petition, with thanksgiving, present your requests to God. And the peace of God, which transcends all understanding, will guard your hearts and your minds in Christ Jesus.'" },
     { role: 'user', text: "That's encouraging. Thank you!" },
@@ -184,7 +158,6 @@ function DemoChat({ open, onClose }: { open: boolean; onClose: () => void }) {
   return (
     <div className="fixed bottom-24 right-6 z-[60] w-full max-w-[350px] animate-scale-in">
       <div className="bg-navy-900 border border-gold-400/30 rounded-2xl shadow-2xl overflow-hidden flex flex-col h-[450px]">
-        {/* Header */}
         <div className="bg-navy-800 p-4 border-b border-navy-700 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-gold-400 rounded-lg flex items-center justify-center">
@@ -200,13 +173,12 @@ function DemoChat({ open, onClose }: { open: boolean; onClose: () => void }) {
           </button>
         </div>
 
-        {/* Messages */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-navy-950/50">
           {messages.map((m, i) => (
             <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in`}>
               <div className={`max-w-[85%] p-3 rounded-2xl text-xs leading-relaxed ${
-                m.role === 'user' 
-                  ? 'bg-gold-400 text-navy-950 rounded-tr-none' 
+                m.role === 'user'
+                  ? 'bg-gold-gradient text-navy-950 rounded-tr-none'
                   : 'bg-navy-800 text-navy-100 border border-navy-700 rounded-tl-none'
               }`}>
                 {m.text}
@@ -226,13 +198,12 @@ function DemoChat({ open, onClose }: { open: boolean; onClose: () => void }) {
           )}
         </div>
 
-        {/* Footer */}
         <div className="p-4 border-t border-navy-800 bg-navy-900">
-          <Link 
-            to="/signup"
+          <Link
+            to={isLoggedIn ? "/dashboard/bible-chat" : "/signup"}
             className="w-full bg-gold-400 text-navy-950 font-bold py-2 rounded-xl text-center text-sm hover:bg-gold-300 transition-colors block"
           >
-            Start Your Own Chat
+            {isLoggedIn ? 'Open Bible Chat' : 'Start Your Own Chat'}
           </Link>
         </div>
       </div>
@@ -240,10 +211,28 @@ function DemoChat({ open, onClose }: { open: boolean; onClose: () => void }) {
   );
 }
 
+function AnimatedSection({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  const { ref, inView } = useInView({ triggerOnce: true, threshold: 0.1 });
+  return (
+    <div
+      ref={ref}
+      className={`transition-all duration-700 ease-out ${inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'} ${className}`}
+    >
+      {children}
+    </div>
+  );
+}
+
 export default function Landing() {
+  const { user, profileCompleted } = useAuth();
+  const isLoggedIn = Boolean(user && profileCompleted);
   const [demoOpen, setDemoOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [testimonialIndex, setTestimonialIndex] = useState(0);
+
+  const ctaLink = isLoggedIn ? '/dashboard' : '/signup';
+  const ctaText = isLoggedIn ? 'Go to Dashboard' : 'Start Free Today';
+  const navCtaText = isLoggedIn ? 'Dashboard' : 'Start Free';
 
   useEffect(() => {
     const handleScroll = () => {
@@ -259,45 +248,54 @@ export default function Landing() {
     }, 5000);
     return () => clearInterval(interval);
   }, []);
+
   return (
     <div className="min-h-screen bg-navy-950">
       {/* Sticky Navbar */}
       <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 border-b ${
-        isScrolled 
-          ? 'bg-navy-950/95 backdrop-blur-md border-navy-800 py-3 translate-y-0' 
+        isScrolled
+          ? 'bg-navy-950/95 backdrop-blur-md border-navy-800 py-3 translate-y-0 opacity-100'
           : 'bg-transparent border-transparent py-5 -translate-y-full opacity-0'
       }`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
-          <div className="flex items-center gap-2">
+          <Link to={isLoggedIn ? '/dashboard' : '/'} className="flex items-center gap-2">
             <div className="w-8 h-8 bg-gold-400 rounded-lg flex items-center justify-center">
               <Cross className="w-4 h-4 text-navy-950" />
             </div>
             <span className="text-xl font-bold text-white">BibleAI</span>
-          </div>
+          </Link>
           <div className="flex items-center gap-4">
-            <Link to="/signin" className="text-sm text-navy-300 hover:text-white transition-colors">Sign In</Link>
-            <Link to="/signup" className="bg-gold-gradient text-navy-950 text-xs font-bold px-5 py-2.5 rounded-full hover:scale-105 transition-transform">Get Started</Link>
+            {!isLoggedIn && (
+              <Link to="/signin" className="text-sm text-navy-300 hover:text-white transition-colors">Sign In</Link>
+            )}
+            <Link to={ctaLink} className="bg-gold-gradient text-navy-950 text-xs font-bold px-5 py-2.5 rounded-full hover:scale-105 transition-transform">
+              {navCtaText}
+            </Link>
           </div>
         </div>
       </nav>
 
-      {/* Hero Navigation (Original) */}
+      {/* Hero Navigation */}
       <nav className="absolute top-0 left-0 right-0 z-40 bg-transparent">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-20">
-          <div className="flex items-center gap-2">
+          <Link to={isLoggedIn ? '/dashboard' : '/'} className="flex items-center gap-2">
             <div className="w-8 h-8 bg-gold-400 rounded-lg flex items-center justify-center">
               <Cross className="w-4 h-4 text-navy-950" />
             </div>
             <span className="text-xl font-bold text-white">BibleAI</span>
-          </div>
+          </Link>
           <div className="hidden md:flex items-center gap-8">
             <a href="#features" className="text-sm text-navy-300 hover:text-white transition-colors">Features</a>
             <a href="#demo" className="text-sm text-navy-300 hover:text-white transition-colors">Live Demo</a>
             <a href="#testimonials" className="text-sm text-navy-300 hover:text-white transition-colors">Testimonials</a>
           </div>
           <div className="flex items-center gap-3">
-            <Link to="/signin" className="text-sm text-navy-300 hover:text-white transition-colors px-4 py-2">Sign In</Link>
-            <Link to="/signup" className="text-sm font-medium bg-gold-400 text-navy-950 px-5 py-2 rounded-lg hover:bg-gold-300 transition-colors">Start Free</Link>
+            {!isLoggedIn && (
+              <Link to="/signin" className="text-sm text-navy-300 hover:text-white transition-colors px-4 py-2">Sign In</Link>
+            )}
+            <Link to={ctaLink} className="text-sm font-medium bg-gold-400 text-navy-950 px-5 py-2 rounded-lg hover:bg-gold-300 transition-colors">
+              {navCtaText}
+            </Link>
           </div>
         </div>
       </nav>
@@ -305,37 +303,38 @@ export default function Landing() {
       {/* Hero */}
       <section className="relative pt-32 pb-20 sm:pt-40 sm:pb-28 overflow-hidden">
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[600px] bg-gold-400/5 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute top-20 right-1/4 w-64 h-64 bg-gold-400/3 rounded-full blur-2xl pointer-events-none animate-float" />
 
         <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <div className="inline-flex items-center gap-2 bg-gold-400/10 border border-gold-400/20 rounded-full px-4 py-1.5 mb-8 animate-fade-in">
             <span className="text-[10px] font-bold text-gold-400 uppercase tracking-widest flex items-center gap-2">
               <span className="w-2 h-2 bg-gold-400 rounded-full animate-pulse" />
-              🆕 Just Launched
+              Just Launched
             </span>
           </div>
 
-          <h1 className="text-4xl sm:text-6xl lg:text-7xl font-bold text-white leading-[1.1] tracking-tight">
+          <h1 className="text-4xl sm:text-6xl lg:text-7xl font-bold text-white leading-[1.1] tracking-tight animate-fade-in-up">
             Meet BibleAI — A New Way to
             <br />
             <span className="text-gold-400 font-serif italic">Experience Scripture</span>
           </h1>
 
-          <p className="mt-6 text-lg sm:text-xl text-navy-300 max-w-2xl mx-auto leading-relaxed">
-            The first AI-powered Bible companion built for modern Christians. 
+          <p className="mt-6 text-lg sm:text-xl text-navy-300 max-w-2xl mx-auto leading-relaxed animate-fade-in-up" style={{ animationDelay: '0.15s' }}>
+            The first AI-powered Bible companion built for modern Christians.
             Chat, study, pray and track your faith journey all in one place.
           </p>
 
-          <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
+          <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4 animate-fade-in-up" style={{ animationDelay: '0.3s' }}>
             <Link
-              to="/signup"
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-gold-400 text-navy-950 font-bold px-8 py-4 rounded-xl hover:bg-gold-300 transition-all duration-150 shadow-lg shadow-gold-400/20 animate-pulse-gold"
+              to={ctaLink}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-gold-400 text-navy-950 font-bold px-8 py-4 rounded-xl hover:bg-gold-300 transition-all duration-200 shadow-lg shadow-gold-400/20 animate-glow"
             >
-              Start Free Today
+              {ctaText}
               <ChevronRight className="w-4 h-4" />
             </Link>
             <a
               href="#demo"
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-navy-800 text-white font-medium px-8 py-4 rounded-xl hover:bg-navy-700 transition-all duration-150 border border-navy-700"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-navy-800 text-white font-medium px-8 py-4 rounded-xl hover:bg-navy-700 transition-all duration-200 border border-navy-700"
             >
               See How It Works
             </a>
@@ -347,13 +346,13 @@ export default function Landing() {
           <div className="mt-20 py-8 border-y border-navy-800/50">
             <p className="text-[10px] uppercase tracking-[0.2em] text-navy-500 font-bold mb-6">Trusted by Christians worldwide</p>
             <div className="relative h-12 overflow-hidden">
-              <div 
+              <div
                 className="absolute inset-0 flex flex-col transition-transform duration-1000 ease-in-out"
                 style={{ transform: `translateY(-${testimonialIndex * 100}%)` }}
               >
                 {testimonials.map((t, i) => (
                   <div key={i} className="h-full flex items-center justify-center gap-4 text-navy-300">
-                    <img src={t.photo} className="w-6 h-6 rounded-full grayscale opacity-50" />
+                    <img src={t.photo} alt={t.name} className="w-6 h-6 rounded-full grayscale opacity-50" />
                     <span className="text-sm italic">&ldquo;{t.quote.slice(0, 80)}...&rdquo;</span>
                     <span className="text-xs font-bold text-navy-500">— {t.name}</span>
                   </div>
@@ -365,256 +364,270 @@ export default function Landing() {
       </section>
 
       {/* Early Adopter Section */}
-      <section className="py-24 bg-navy-900/30 border-y border-navy-800/50">
-        <div className="max-w-4xl mx-auto px-4 text-center">
-          <div className="inline-block p-1 rounded-2xl bg-gold-gradient mb-6">
-            <div className="bg-navy-950 rounded-[14px] px-6 py-8">
-              <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">Be Among The First</h2>
-              <p className="text-navy-200 text-lg mb-8 max-w-2xl mx-auto leading-relaxed">
-                BibleAI is brand new. Join early and help shape the future of faith-based technology. 
-                Early members get locked in at our <span className="text-gold-400 font-bold">lowest price forever</span>.
-              </p>
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                <Link
-                  to="/signup"
-                  className="w-full sm:w-auto bg-gold-400 text-navy-950 font-bold px-8 py-4 rounded-xl hover:bg-gold-300 transition-all shadow-lg shadow-gold-400/20"
-                >
-                  Join the Early Adopter Program
-                </Link>
+      <AnimatedSection>
+        <section className="py-24 bg-navy-900/30 border-y border-navy-800/50">
+          <div className="max-w-4xl mx-auto px-4 text-center">
+            <div className="inline-block p-1 rounded-2xl bg-gold-gradient mb-6">
+              <div className="bg-navy-950 rounded-[14px] px-6 py-8">
+                <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">Be Among The First</h2>
+                <p className="text-navy-200 text-lg mb-8 max-w-2xl mx-auto leading-relaxed">
+                  BibleAI is brand new. Join early and help shape the future of faith-based technology.
+                  Early members get locked in at our <span className="text-gold-400 font-bold">lowest price forever</span>.
+                </p>
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                  <Link
+                    to={ctaLink}
+                    className="w-full sm:w-auto bg-gold-400 text-navy-950 font-bold px-8 py-4 rounded-xl hover:bg-gold-300 transition-all shadow-lg shadow-gold-400/20"
+                  >
+                    Join the Early Adopter Program
+                  </Link>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
+      </AnimatedSection>
 
       {/* Live Demo Section */}
-      <section id="demo" className="py-24 sm:py-32 overflow-hidden">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid lg:grid-cols-2 gap-16 items-center">
-            <div>
-              <h2 className="text-3xl sm:text-5xl font-bold text-white mb-6">
-                Watch the <span className="text-gold-400">Word</span> Come to Life
-              </h2>
-              <p className="text-lg text-navy-300 mb-8 leading-relaxed">
-                BibleAI isn&apos;t just a chat bot. It&apos;s a dedicated spiritual assistant that understands the nuance of scripture, context of theology, and the power of prayer.
-              </p>
-              <ul className="space-y-4">
-                {[
-                  'Instant scripture-backed answers',
-                  'Fuzzy matching for difficult references',
-                  'Deep theological context',
-                  'Encouraging, faith-centered tone'
-                ].map(item => (
-                  <li key={item} className="flex items-center gap-3 text-navy-200">
-                    <div className="w-5 h-5 bg-emerald-400/10 rounded-full flex items-center justify-center border border-emerald-400/20">
-                      <Check className="w-3 h-3 text-emerald-400" />
-                    </div>
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* Scrolling Chat Demo */}
-            <div className="relative group">
-              <div className="absolute -inset-1 bg-gradient-to-r from-gold-400/20 to-navy-900 rounded-[32px] blur opacity-25 group-hover:opacity-40 transition-opacity" />
-              <div className="relative bg-navy-950 border border-navy-800 rounded-[32px] overflow-hidden shadow-2xl aspect-[4/3] flex flex-col">
-                <div className="p-6 border-b border-navy-800 flex items-center gap-3 bg-navy-900/50">
-                  <div className="w-10 h-10 bg-gold-400 rounded-xl flex items-center justify-center">
-                    <Cross className="w-5 h-5 text-navy-950" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold text-white">BibleAI Interactive</p>
-                    <p className="text-xs text-navy-400">Always learning, always teaching</p>
-                  </div>
-                </div>
-                <div className="flex-1 p-6 space-y-6 overflow-hidden relative">
-                  <div className="space-y-6 animate-[scroll-demo_20s_linear_infinite]">
-                    {[
-                      { r: 'user', t: 'What is the most repeated command in the Bible?' },
-                      { r: 'bot', t: 'The most repeated command is "Do not be afraid" (or some variation of "Fear not"). It appears over 365 times, once for every day of the year.' },
-                      { r: 'user', t: 'Wow. Why is that?' },
-                      { r: 'bot', t: 'Because God knows our human nature. He constantly reassures us of His presence: "So do not fear, for I am with you; do not be dismayed, for I am your God." (Isaiah 41:10)' },
-                      { r: 'user', t: 'Explain the meaning of John 3:16' },
-                      { r: 'bot', t: 'John 3:16 captures the heart of the Gospel: God&apos;s love was so great that He gave His only Son, so that through faith in Him, we could have eternal life instead of perish.' },
-                      { r: 'user', t: 'How do I start a prayer routine?' },
-                      { r: 'bot', t: 'Start small. Jesus taught the Lord&apos;s Prayer as a model. Focus on Gratitude, Repentance, and Petition. BibleAI&apos;s prayer journal can help track these daily.' },
-                    ].map((m, i) => (
-                      <div key={i} className={`flex ${m.r === 'user' ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`max-w-[80%] px-5 py-4 rounded-2xl text-[13px] leading-relaxed shadow-lg ${
-                          m.r === 'user' ? 'bg-gold-gradient text-navy-950 font-medium' : 'bg-navy-900 border border-navy-800 text-navy-100'
-                        }`}>
-                          {m.t}
-                        </div>
+      <AnimatedSection>
+        <section id="demo" className="py-24 sm:py-32 overflow-hidden">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="grid lg:grid-cols-2 gap-16 items-center">
+              <div>
+                <h2 className="text-3xl sm:text-5xl font-bold text-white mb-6">
+                  Watch the <span className="text-gold-400">Word</span> Come to Life
+                </h2>
+                <p className="text-lg text-navy-300 mb-8 leading-relaxed">
+                  BibleAI isn&apos;t just a chat bot. It&apos;s a dedicated spiritual assistant that understands the nuance of scripture, context of theology, and the power of prayer.
+                </p>
+                <ul className="space-y-4">
+                  {[
+                    'Instant scripture-backed answers',
+                    'Fuzzy matching for difficult references',
+                    'Deep theological context',
+                    'Encouraging, faith-centered tone'
+                  ].map(item => (
+                    <li key={item} className="flex items-center gap-3 text-navy-200">
+                      <div className="w-5 h-5 bg-emerald-400/10 rounded-full flex items-center justify-center border border-emerald-400/20">
+                        <Check className="w-3 h-3 text-emerald-400" />
                       </div>
-                    ))}
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* Scrolling Chat Demo */}
+              <div className="relative group">
+                <div className="absolute -inset-1 bg-gradient-to-r from-gold-400/20 to-navy-900 rounded-[32px] blur opacity-25 group-hover:opacity-40 transition-opacity duration-500" />
+                <div className="relative bg-navy-950 border border-navy-800 rounded-[32px] overflow-hidden shadow-2xl aspect-[4/3] flex flex-col">
+                  <div className="p-6 border-b border-navy-800 flex items-center gap-3 bg-navy-900/50">
+                    <div className="w-10 h-10 bg-gold-400 rounded-xl flex items-center justify-center">
+                      <Cross className="w-5 h-5 text-navy-950" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-white">BibleAI Interactive</p>
+                      <p className="text-xs text-navy-400">Always learning, always teaching</p>
+                    </div>
                   </div>
-                  <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-navy-950 to-transparent z-10" />
+                  <div className="flex-1 p-6 space-y-6 overflow-hidden relative">
+                    <div className="space-y-6 animate-[scroll-demo_20s_linear_infinite]">
+                      {[
+                        { r: 'user', t: 'What is the most repeated command in the Bible?' },
+                        { r: 'bot', t: 'The most repeated command is "Do not be afraid" (or some variation of "Fear not"). It appears over 365 times, once for every day of the year.' },
+                        { r: 'user', t: 'Wow. Why is that?' },
+                        { r: 'bot', t: 'Because God knows our human nature. He constantly reassures us of His presence: "So do not fear, for I am with you; do not be dismayed, for I am your God." (Isaiah 41:10)' },
+                        { r: 'user', t: 'Explain the meaning of John 3:16' },
+                        { r: 'bot', t: 'John 3:16 captures the heart of the Gospel: God\'s love was so great that He gave His only Son, so that through faith in Him, we could have eternal life instead of perish.' },
+                        { r: 'user', t: 'How do I start a prayer routine?' },
+                        { r: 'bot', t: 'Start small. Jesus taught the Lord\'s Prayer as a model. Focus on Gratitude, Repentance, and Petition. BibleAI\'s prayer journal can help track these daily.' },
+                      ].map((m, i) => (
+                        <div key={i} className={`flex ${m.r === 'user' ? 'justify-end' : 'justify-start'}`}>
+                          <div className={`max-w-[80%] px-5 py-4 rounded-2xl text-[13px] leading-relaxed shadow-lg ${
+                            m.r === 'user' ? 'bg-gold-gradient text-navy-950 font-medium' : 'bg-navy-900 border border-navy-800 text-navy-100'
+                          }`}>
+                            {m.t}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-navy-950 to-transparent z-10" />
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
+      </AnimatedSection>
 
       {/* Bible Reader Feature Section */}
-      <section className="py-24 bg-navy-900/20 border-y border-navy-800/50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">
-              A Complete <span className="text-gold-400">Reading Experience</span>
-            </h2>
-            <p className="text-navy-300 max-w-2xl mx-auto">
-              Our full-featured Bible reader allows you to highlight verses, search with fuzzy logic, and even listen to chapters aloud.
-            </p>
-          </div>
-          <div className="relative max-w-5xl mx-auto">
-            <div className="absolute -inset-4 bg-gold-400/10 rounded-[40px] blur-2xl" />
-            <div className="relative bg-navy-950 border border-navy-800 rounded-[32px] overflow-hidden shadow-2xl">
-              {/* Mockup Top Bar */}
-              <div className="flex items-center justify-between px-6 py-4 border-b border-navy-800 bg-navy-900/50">
-                <div className="flex gap-4">
-                  <div className="px-3 py-1 bg-navy-800 border border-navy-700 rounded-lg text-xs text-gold-400">Genesis</div>
-                  <div className="px-3 py-1 bg-navy-800 border border-navy-700 rounded-lg text-xs text-gold-400">Chapter 1</div>
-                </div>
-                <div className="w-32 h-6 bg-navy-800 rounded-full" />
-              </div>
-              {/* Mockup Content */}
-              <div className="p-8 sm:p-12 space-y-6">
-                {[1, 2, 3, 4, 5].map(v => (
-                  <div key={v} className="flex gap-4">
-                    <span className="text-gold-400 font-bold text-sm mt-1">{v}</span>
-                    <div className={`h-4 bg-navy-800 rounded-full ${v % 2 === 0 ? 'w-full' : 'w-2/3'}`} />
+      <AnimatedSection>
+        <section className="py-24 bg-navy-900/20 border-y border-navy-800/50">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center mb-16">
+              <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">
+                A Complete <span className="text-gold-400">Reading Experience</span>
+              </h2>
+              <p className="text-navy-300 max-w-2xl mx-auto">
+                Our full-featured Bible reader allows you to highlight verses, search with fuzzy logic, and even listen to chapters aloud.
+              </p>
+            </div>
+            <div className="relative max-w-5xl mx-auto">
+              <div className="absolute -inset-4 bg-gold-400/10 rounded-[40px] blur-2xl" />
+              <div className="relative bg-navy-950 border border-navy-800 rounded-[32px] overflow-hidden shadow-2xl">
+                <div className="flex items-center justify-between px-6 py-4 border-b border-navy-800 bg-navy-900/50">
+                  <div className="flex gap-4">
+                    <div className="px-3 py-1 bg-navy-800 border border-navy-700 rounded-lg text-xs text-gold-400">Genesis</div>
+                    <div className="px-3 py-1 bg-navy-800 border border-navy-700 rounded-lg text-xs text-gold-400">Chapter 1</div>
                   </div>
-                ))}
-                <div className="pt-8 flex justify-center">
-                  <button className="bg-navy-800 border border-gold-400/20 text-gold-400 px-6 py-2 rounded-full text-sm font-bold flex items-center gap-2">
-                    <Play className="w-4 h-4 fill-gold-400" />
-                    Listen to Chapter
-                  </button>
+                  <div className="w-32 h-6 bg-navy-800 rounded-full" />
+                </div>
+                <div className="p-8 sm:p-12 space-y-6">
+                  {[1, 2, 3, 4, 5].map(v => (
+                    <div key={v} className="flex gap-4">
+                      <span className="text-gold-400 font-bold text-sm mt-1">{v}</span>
+                      <div className={`h-4 bg-navy-800 rounded-full ${v % 2 === 0 ? 'w-full' : 'w-2/3'}`} />
+                    </div>
+                  ))}
+                  <div className="pt-8 flex justify-center">
+                    <button className="bg-navy-800 border border-gold-400/20 text-gold-400 px-6 py-2 rounded-full text-sm font-bold flex items-center gap-2">
+                      <Play className="w-4 h-4 fill-gold-400" />
+                      Listen to Chapter
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div className="absolute -bottom-6 -right-6 sm:right-12 bg-navy-900 border border-gold-400/40 rounded-2xl p-4 shadow-2xl animate-float">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-gold-400/10 rounded-lg flex items-center justify-center border border-gold-400/20">
+                    <BookOpen className="w-4 h-4 text-gold-400" />
+                  </div>
+                  <p className="text-xs font-bold text-white italic">"Highlight & Ask AI"</p>
                 </div>
               </div>
             </div>
-            {/* Pop-up mockup */}
-            <div className="absolute -bottom-6 -right-6 sm:right-12 bg-navy-900 border border-gold-400/40 rounded-2xl p-4 shadow-2xl animate-bounce">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-gold-400/10 rounded-lg flex items-center justify-center border border-gold-400/20 text-gold-400">📖</div>
-                <p className="text-xs font-bold text-white italic">"Highlight & Ask AI"</p>
-              </div>
-            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      </AnimatedSection>
 
       {/* Features */}
-      <section id="features" className="py-20 sm:py-28">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl sm:text-4xl font-bold text-white">
-              Everything You Need to <span className="text-gold-400">Grow</span>
-            </h2>
-            <p className="mt-4 text-navy-300 max-w-xl mx-auto">
-              Tools designed to deepen your relationship with God through scripture, prayer, and reflection.
-            </p>
-          </div>
+      <AnimatedSection>
+        <section id="features" className="py-20 sm:py-28">
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center mb-16">
+              <h2 className="text-3xl sm:text-4xl font-bold text-white">
+                Everything You Need to <span className="text-gold-400">Grow</span>
+              </h2>
+              <p className="mt-4 text-navy-300 max-w-xl mx-auto">
+                Tools designed to deepen your relationship with God through scripture, prayer, and reflection.
+              </p>
+            </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {features.map((feature) => {
-              const Icon = feature.icon;
-              return (
-                <div
-                  key={feature.title}
-                  className="group bg-navy-900/50 border border-navy-800 rounded-2xl p-6 hover:border-gold-400/30 hover:bg-navy-900/80 transition-all duration-200"
-                >
-                  <div className="w-12 h-12 bg-gold-400/10 rounded-xl flex items-center justify-center mb-4 group-hover:bg-gold-400/20 transition-colors">
-                    <Icon className="w-6 h-6 text-gold-400" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 animate-slide-up-stagger">
+              {features.map((feature) => {
+                const Icon = feature.icon;
+                return (
+                  <div
+                    key={feature.title}
+                    className="group bg-navy-900/50 border border-navy-800 rounded-2xl p-6 hover:border-gold-400/30 hover:bg-navy-900/80 hover:-translate-y-1 transition-all duration-300"
+                  >
+                    <div className="w-12 h-12 bg-gold-400/10 rounded-xl flex items-center justify-center mb-4 group-hover:bg-gold-400/20 group-hover:scale-110 transition-all duration-300">
+                      <Icon className="w-6 h-6 text-gold-400" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-white mb-2">{feature.title}</h3>
+                    <p className="text-xs text-navy-300 leading-relaxed">{feature.description}</p>
                   </div>
-                  <h3 className="text-lg font-semibold text-white mb-2">{feature.title}</h3>
-                  <p className="text-xs text-navy-300 leading-relaxed">{feature.description}</p>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      </AnimatedSection>
 
       {/* Testimonials */}
-      <section id="testimonials" className="py-20 sm:py-28 border-t border-navy-800/50">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-3xl font-bold text-white mb-12">Building the <span className="text-gold-400 font-serif italic">Future of Faith</span></h2>
-          <div className="grid md:grid-cols-3 gap-8">
-            {[
-              { t: 'The AI is incredibly respectful and scripture-accurate.', a: 'Initial Beta Member' },
-              { t: 'Finally, a prayer journal that actually helps me stay consistent.', a: 'Early Adopter' },
-              { t: 'The daily devotionals are a breath of fresh air every morning.', a: 'Beta Tester' }
-            ].map((test, i) => (
-              <div key={i} className="p-6 bg-navy-900/40 border border-navy-800 rounded-2xl">
-                <p className="text-navy-200 italic mb-4 text-sm">"{test.t}"</p>
-                <p className="text-[10px] text-gold-400 font-bold uppercase tracking-wider">— {test.a}</p>
-              </div>
-            ))}
+      <AnimatedSection>
+        <section id="testimonials" className="py-20 sm:py-28 border-t border-navy-800/50">
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <h2 className="text-3xl font-bold text-white mb-12">Building the <span className="text-gold-400 font-serif italic">Future of Faith</span></h2>
+            <div className="grid md:grid-cols-3 gap-8">
+              {[
+                { t: 'The AI is incredibly respectful and scripture-accurate.', a: 'Initial Beta Member' },
+                { t: 'Finally, a prayer journal that actually helps me stay consistent.', a: 'Early Adopter' },
+                { t: 'The daily devotionals are a breath of fresh air every morning.', a: 'Beta Tester' }
+              ].map((test, i) => (
+                <div key={i} className="p-6 bg-navy-900/40 border border-navy-800 rounded-2xl hover:border-gold-400/20 transition-all duration-300 hover:-translate-y-1">
+                  <p className="text-navy-200 italic mb-4 text-sm">"{test.t}"</p>
+                  <p className="text-[10px] text-gold-400 font-bold uppercase tracking-wider">— {test.a}</p>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      </AnimatedSection>
 
       {/* FAQ */}
-      <section id="faq" className="py-20 sm:py-28 border-t border-navy-800/50">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl sm:text-4xl font-bold text-white">
-              Frequently Asked <span className="text-gold-400">Questions</span>
-            </h2>
-            <p className="mt-4 text-navy-300 max-w-xl mx-auto">
-              Got questions? We have answers.
-            </p>
-          </div>
+      <AnimatedSection>
+        <section id="faq" className="py-20 sm:py-28 border-t border-navy-800/50">
+          <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center mb-16">
+              <h2 className="text-3xl sm:text-4xl font-bold text-white">
+                Frequently Asked <span className="text-gold-400">Questions</span>
+              </h2>
+              <p className="mt-4 text-navy-300 max-w-xl mx-auto">
+                Got questions? We have answers.
+              </p>
+            </div>
 
-          <div className="bg-navy-900/50 border border-navy-800 rounded-2xl px-6 sm:px-8">
-            {faqs.map((faq) => (
-              <FAQItem key={faq.question} question={faq.question} answer={faq.answer} />
-            ))}
+            <div className="bg-navy-900/50 border border-navy-800 rounded-2xl px-6 sm:px-8">
+              {faqs.map((faq) => (
+                <FAQItem key={faq.question} question={faq.question} answer={faq.answer} />
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      </AnimatedSection>
 
       {/* Final CTA */}
-      <section className="py-20 sm:py-28 border-t border-navy-800/50">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <div className="bg-gradient-to-br from-navy-900 to-navy-900/50 border border-gold-400/20 rounded-2xl p-8 sm:p-12">
-            <h2 className="text-2xl sm:text-3xl font-bold text-white mb-4">
-              Start Growing in Faith <span className="text-gold-400">Today</span>
-            </h2>
-            <p className="text-navy-300 mb-8 max-w-lg mx-auto">
-              Join thousands of believers using AI to deepen their understanding of scripture and strengthen their prayer life.
-            </p>
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Link
-                to="/signup"
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-gold-400 text-navy-950 font-semibold px-8 py-3.5 rounded-xl hover:bg-gold-300 transition-all duration-150 shadow-lg shadow-gold-400/20"
-              >
-                Start Free Today
-                <ChevronRight className="w-4 h-4" />
-              </Link>
-            </div>
-            <div className="flex items-center justify-center gap-4 mt-6 text-xs text-navy-400">
-              <span className="flex items-center gap-1"><Check className="w-3.5 h-3.5 text-emerald-400" /> Free plan available</span>
-              <span className="flex items-center gap-1"><Check className="w-3.5 h-3.5 text-emerald-400" /> No credit card required</span>
-              <span className="flex items-center gap-1"><Check className="w-3.5 h-3.5 text-emerald-400" /> Cancel anytime</span>
+      <AnimatedSection>
+        <section className="py-20 sm:py-28 border-t border-navy-800/50">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <div className="bg-gradient-to-br from-navy-900 to-navy-900/50 border border-gold-400/20 rounded-2xl p-8 sm:p-12 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-gold-400/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+              <h2 className="text-2xl sm:text-3xl font-bold text-white mb-4 relative">
+                Start Growing in Faith <span className="text-gold-400">Today</span>
+              </h2>
+              <p className="text-navy-300 mb-8 max-w-lg mx-auto relative">
+                Join thousands of believers using AI to deepen their understanding of scripture and strengthen their prayer life.
+              </p>
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-4 relative">
+                <Link
+                  to={ctaLink}
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-gold-400 text-navy-950 font-semibold px-8 py-3.5 rounded-xl hover:bg-gold-300 transition-all duration-200 shadow-lg shadow-gold-400/20"
+                >
+                  {ctaText}
+                  <ArrowRight className="w-4 h-4" />
+                </Link>
+              </div>
+              <div className="flex items-center justify-center gap-4 mt-6 text-xs text-navy-400 relative">
+                <span className="flex items-center gap-1"><Check className="w-3.5 h-3.5 text-emerald-400" /> Free plan available</span>
+                <span className="flex items-center gap-1"><Check className="w-3.5 h-3.5 text-emerald-400" /> No credit card required</span>
+                <span className="flex items-center gap-1"><Check className="w-3.5 h-3.5 text-emerald-400" /> Cancel anytime</span>
+              </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
+      </AnimatedSection>
 
       {/* Footer */}
       <footer className="border-t border-navy-800/50 py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-            <div className="flex items-center gap-2">
+            <Link to={isLoggedIn ? '/dashboard' : '/'} className="flex items-center gap-2">
               <div className="w-7 h-7 bg-gold-400 rounded-lg flex items-center justify-center">
                 <Cross className="w-3.5 h-3.5 text-navy-950" />
               </div>
               <span className="text-sm font-bold text-white">BibleAI</span>
-            </div>
+            </Link>
             <div className="flex items-center gap-6">
               <Link to="/privacy" className="text-xs text-navy-400 hover:text-white transition-colors">Privacy</Link>
               <Link to="/terms" className="text-xs text-navy-400 hover:text-white transition-colors">Terms</Link>
@@ -637,7 +650,7 @@ export default function Landing() {
         </button>
       )}
 
-      <DemoChat open={demoOpen} onClose={() => setDemoOpen(false)} />
+      <DemoChat open={demoOpen} onClose={() => setDemoOpen(false)} isLoggedIn={isLoggedIn} />
     </div>
   );
 }

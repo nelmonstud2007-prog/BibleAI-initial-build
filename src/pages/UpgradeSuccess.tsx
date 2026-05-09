@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { CheckCircle, Crown, Loader2, Sparkles } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -14,18 +14,9 @@ const PLAN_TIER_MAP: Record<string, SubscriptionTier> = {
   yearly: 'pro_yearly',
 };
 
-const MAX_POLLS = 12;   // 12 × 2 s = 24 s max wait
-const POLL_MS   = 2000;
+const MAX_POLLS = 15;
+const POLL_MS = 2000;
 
-/**
- * /upgrade-success?plan=monthly  OR  /upgrade-success?plan=yearly
- *
- * This page:
- *  1. Shows a success UI immediately (so the user isn't left on a blank page).
- *  2. Polls Supabase in the background until the webhook has updated the profile.
- *  3. Updates AuthContext once confirmed.
- *  4. Provides a "Go to Dashboard" CTA.
- */
 export default function UpgradeSuccess() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -38,8 +29,11 @@ export default function UpgradeSuccess() {
   const [confirmed, setConfirmed] = useState(false);
   const [polling, setPolling] = useState(true);
   const [polls, setPolls] = useState(0);
+  const tierRef = useRef(subscriptionTier);
 
-  // Poll until the DB tier matches what we expect, or we time-out
+  // Keep the ref in sync so the interval callback reads the latest value
+  tierRef.current = subscriptionTier;
+
   useEffect(() => {
     if (!user) return;
 
@@ -50,20 +44,23 @@ export default function UpgradeSuccess() {
       return;
     }
 
+    let pollCount = 0;
+
     const interval = setInterval(async () => {
-      setPolls((p) => {
-        if (p >= MAX_POLLS) {
-          clearInterval(interval);
-          setPolling(false);
-          // We stop polling but still show success — webhook can lag
-          return p;
-        }
-        return p + 1;
-      });
+      pollCount++;
+      setPolls(pollCount);
+
+      if (pollCount >= MAX_POLLS) {
+        clearInterval(interval);
+        setPolling(false);
+        return;
+      }
 
       await refreshProfile();
 
-      if (subscriptionTier === expectedTier) {
+      // Read the latest tier from the ref (refreshProfile triggers a re-render
+      // but the interval closure still sees the old value)
+      if (tierRef.current === expectedTier) {
         clearInterval(interval);
         setConfirmed(true);
         setPolling(false);
@@ -71,35 +68,33 @@ export default function UpgradeSuccess() {
     }, POLL_MS);
 
     return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id]);
+  }, [user?.id, subscriptionTier, expectedTier, refreshProfile]);
 
-  // Once confirmed via polling re-render, stop interval
+  // Also confirm on re-render if tier has changed
   useEffect(() => {
-    if (subscriptionTier === expectedTier && polling) {
+    if (subscriptionTier === expectedTier && !confirmed) {
       setConfirmed(true);
       setPolling(false);
     }
-  }, [subscriptionTier, expectedTier, polling]);
+  }, [subscriptionTier, expectedTier, confirmed]);
 
   return (
     <div className="min-h-screen bg-navy-950 flex items-center justify-center px-4">
-      <div className="max-w-md w-full text-center">
-        {/* Icon */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] bg-gold-400/5 rounded-full blur-3xl pointer-events-none" />
+
+      <div className="max-w-md w-full text-center relative">
         <div className="w-24 h-24 bg-gold-400/10 rounded-3xl flex items-center justify-center mx-auto mb-8 border border-gold-400/20 shadow-2xl shadow-gold-400/10 animate-fade-in-up">
           <Crown className="w-12 h-12 text-gold-400" />
         </div>
 
-        {/* Heading */}
         <h1 className="text-3xl font-bold text-white mb-3 animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
-          Welcome to Pro! 🎉
+          Welcome to Pro!
         </h1>
         <p className="text-navy-300 mb-8 animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
           Your <span className="text-gold-400 font-semibold">{planLabel}</span> subscription
           is now active. Enjoy unlimited access to all BibleAI features.
         </p>
 
-        {/* Confirmation status */}
         <div
           className="bg-navy-900/80 border border-navy-800 rounded-2xl p-5 mb-8 animate-fade-in-up"
           style={{ animationDelay: '0.3s' }}
@@ -128,7 +123,6 @@ export default function UpgradeSuccess() {
           )}
         </div>
 
-        {/* What's unlocked */}
         <ul className="text-left space-y-3 mb-8 animate-fade-in-up" style={{ animationDelay: '0.4s' }}>
           {[
             'Unlimited AI Bible Chat messages',
@@ -144,7 +138,6 @@ export default function UpgradeSuccess() {
           ))}
         </ul>
 
-        {/* CTA */}
         <button
           onClick={() => navigate('/dashboard')}
           className="w-full bg-gold-400 text-navy-950 font-semibold py-3.5 rounded-xl hover:bg-gold-300 transition-colors shadow-lg shadow-gold-400/20 flex items-center justify-center gap-2 animate-fade-in-up"

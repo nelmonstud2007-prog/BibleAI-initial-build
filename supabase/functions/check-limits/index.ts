@@ -48,7 +48,7 @@ Deno.serve(async (req: Request) => {
       .maybeSingle();
 
     const tier = profile?.subscription_tier || "free";
-    const isPro = tier === "pro";
+    const isPro = tier === "pro_monthly" || tier === "pro_yearly" || tier === "pro";
 
     // Check AI message usage
     const today = new Date().toISOString().split("T")[0];
