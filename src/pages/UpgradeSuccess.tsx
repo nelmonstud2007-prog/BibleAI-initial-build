@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { CheckCircle, Crown, Loader2, Sparkles, PartyPopper } from 'lucide-react';
+import { CheckCircle, Crown, Loader2, Sparkles, ArrowRight, Shield, MessageSquare, BookOpen, BarChart3, Calendar } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import type { SubscriptionTier } from '../context/AuthContext';
 
@@ -14,13 +14,21 @@ const PLAN_TIER_MAP: Record<string, SubscriptionTier> = {
   yearly: 'pro_yearly',
 };
 
-const MAX_POLLS = 15;
-const POLL_MS = 2000;
+const MAX_POLLS = 20;
+const POLL_MS   = 2500;
+
+const PRO_FEATURES = [
+  { icon: MessageSquare, label: 'Unlimited AI Bible Chat' },
+  { icon: BookOpen,      label: 'Unlimited prayer entries' },
+  { icon: BarChart3,     label: 'Prayer analytics & insights' },
+  { icon: Sparkles,      label: 'Priority AI responses' },
+  { icon: Calendar,      label: 'Daily devotional archive' },
+];
 
 export default function UpgradeSuccess() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { user, subscriptionTier, refreshProfile } = useAuth();
+  const { user, subscriptionTier, refreshProfile, refreshLimits } = useAuth();
 
   const plan = searchParams.get('plan') ?? 'monthly';
   const planLabel = PLAN_LABELS[plan] ?? 'Pro';
@@ -29,139 +37,171 @@ export default function UpgradeSuccess() {
   const [confirmed, setConfirmed] = useState(false);
   const [polling, setPolling] = useState(true);
   const [polls, setPolls] = useState(0);
-  const tierRef = useRef(subscriptionTier);
-  const [showCelebration, setShowCelebration] = useState(false);
+  const [showContent, setShowContent] = useState(false);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Keep the ref in sync so the interval callback reads the latest value
-  tierRef.current = subscriptionTier;
-
-  // Trigger celebration animation after mount
+  // Animate content in after mount
   useEffect(() => {
-    const timer = setTimeout(() => setShowCelebration(true), 200);
-    return () => clearTimeout(timer);
+    const t = setTimeout(() => setShowContent(true), 150);
+    return () => clearTimeout(t);
   }, []);
 
+  // If already upgraded before page even loaded
   useEffect(() => {
-    if (!user) return;
-
-    // Already correct — webhook may have fired before page loaded
     if (subscriptionTier === expectedTier) {
       setConfirmed(true);
       setPolling(false);
-      return;
     }
+  }, [subscriptionTier, expectedTier]);
 
-    let pollCount = 0;
+  // Polling — uses refreshProfile's RETURN VALUE (not stale closure state)
+  const startPolling = useCallback(async () => {
+    if (!user || confirmed) return;
 
-    const interval = setInterval(async () => {
-      pollCount++;
-      setPolls(pollCount);
+    let count = 0;
 
-      if (pollCount >= MAX_POLLS) {
-        clearInterval(interval);
+    intervalRef.current = setInterval(async () => {
+      count++;
+      setPolls(count);
+
+      if (count >= MAX_POLLS) {
+        if (intervalRef.current) clearInterval(intervalRef.current);
         setPolling(false);
         return;
       }
 
-      await refreshProfile();
+      // refreshProfile now RETURNS the fresh tier directly
+      const freshTier = await refreshProfile();
 
-      // Read the latest tier from the ref (refreshProfile triggers a re-render
-      // but the interval closure still sees the old value)
-      if (tierRef.current === expectedTier) {
-        clearInterval(interval);
+      if (freshTier === expectedTier) {
+        if (intervalRef.current) clearInterval(intervalRef.current);
         setConfirmed(true);
         setPolling(false);
+        void refreshLimits();
       }
     }, POLL_MS);
+  }, [user, confirmed, expectedTier, refreshProfile]);
 
-    return () => clearInterval(interval);
-  }, [user?.id, subscriptionTier, expectedTier, refreshProfile]);
-
-  // Also confirm on re-render if tier has changed
   useEffect(() => {
-    if (subscriptionTier === expectedTier && !confirmed) {
-      setConfirmed(true);
-      setPolling(false);
+    if (user && !confirmed) {
+      startPolling();
     }
-  }, [subscriptionTier, expectedTier, confirmed]);
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [user?.id, confirmed, startPolling]);
+
+  const progressPct = Math.min((polls / MAX_POLLS) * 100, 100);
 
   return (
     <div className="min-h-screen bg-navy-950 flex items-center justify-center px-4 relative overflow-hidden">
-      {/* Decorative background elements */}
-      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-gold-400/5 rounded-full blur-3xl pointer-events-none animate-float" />
-      <div className="absolute bottom-1/4 right-1/4 w-72 h-72 bg-gold-400/5 rounded-full blur-3xl pointer-events-none animate-float" style={{ animationDelay: '3s' }} />
+      {/* Background decoration */}
+      <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-gold-400/[0.03] rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-1/3 right-1/4 w-80 h-80 bg-gold-400/[0.04] rounded-full blur-3xl pointer-events-none" />
 
-      <div className="max-w-md w-full text-center relative z-10">
-        {/* Icon */}
-        <div className={`w-24 h-24 bg-gold-400/10 rounded-3xl flex items-center justify-center mx-auto mb-8 border border-gold-400/20 shadow-2xl shadow-gold-400/10 ${showCelebration ? 'animate-celebration' : 'opacity-0'} animate-glow-pulse`}>
-          <Crown className="w-12 h-12 text-gold-400" />
+      <div className={`max-w-lg w-full relative z-10 transition-all duration-700 ${showContent ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+
+        {/* Main Card */}
+        <div className="bg-navy-900/60 backdrop-blur-sm border border-navy-800 rounded-3xl p-8 sm:p-10 shadow-2xl shadow-black/20">
+
+          {/* Crown Icon */}
+          <div className="flex justify-center mb-6">
+            <div className={`w-20 h-20 rounded-2xl flex items-center justify-center transition-all duration-700 delay-300 ${
+              confirmed
+                ? 'bg-emerald-400/10 border-2 border-emerald-400/30'
+                : 'bg-gold-400/10 border-2 border-gold-400/20 animate-pulse-gold'
+            }`}>
+              {confirmed ? (
+                <CheckCircle className="w-10 h-10 text-emerald-400" />
+              ) : (
+                <Crown className="w-10 h-10 text-gold-400" />
+              )}
+            </div>
+          </div>
+
+          {/* Title */}
+          <h1 className="text-2xl sm:text-3xl font-bold text-white text-center mb-2">
+            {confirmed ? 'You\'re All Set!' : 'Welcome to Pro! 🎉'}
+          </h1>
+          <p className="text-sm text-navy-300 text-center mb-8">
+            Your <span className="text-gold-400 font-semibold">{planLabel}</span> subscription
+            {confirmed ? ' is active.' : ' is being activated.'}
+          </p>
+
+          {/* Status Indicator */}
+          <div className="mb-8">
+            {confirmed ? (
+              <div className="flex items-center justify-center gap-2.5 bg-emerald-400/10 border border-emerald-400/20 rounded-xl px-4 py-3">
+                <CheckCircle className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                <span className="text-sm font-medium text-emerald-400">
+                  Subscription confirmed — account upgraded!
+                </span>
+              </div>
+            ) : polling ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-center gap-2.5">
+                  <Loader2 className="w-4 h-4 animate-spin text-gold-400 flex-shrink-0" />
+                  <span className="text-sm text-navy-300">
+                    Activating your subscription&hellip;
+                  </span>
+                </div>
+                {/* Progress bar */}
+                <div className="h-1.5 bg-navy-800 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-gold-400 to-gold-300 rounded-full transition-all duration-500 ease-out"
+                    style={{ width: `${progressPct}%` }}
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center gap-2.5 bg-navy-800/50 border border-navy-700 rounded-xl px-4 py-3">
+                <Shield className="w-4 h-4 text-navy-400 flex-shrink-0" />
+                <span className="text-sm text-navy-400">
+                  Processing — your upgrade will appear shortly.
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Features Grid */}
+          <div className="space-y-2.5 mb-8">
+            <p className="text-[10px] font-bold text-navy-500 uppercase tracking-widest mb-3">What&apos;s unlocked</p>
+            {PRO_FEATURES.map((f, i) => {
+              const Icon = f.icon;
+              return (
+                <div
+                  key={f.label}
+                  className="flex items-center gap-3 bg-navy-800/30 border border-navy-800/50 rounded-xl px-4 py-3 transition-all duration-500"
+                  style={{
+                    transitionDelay: `${300 + i * 80}ms`,
+                    opacity: showContent ? 1 : 0,
+                    transform: showContent ? 'translateX(0)' : 'translateX(-12px)',
+                  }}
+                >
+                  <div className="w-8 h-8 rounded-lg bg-gold-400/10 flex items-center justify-center flex-shrink-0">
+                    <Icon className="w-4 h-4 text-gold-400" />
+                  </div>
+                  <span className="text-sm text-navy-200 font-medium">{f.label}</span>
+                  <CheckCircle className="w-3.5 h-3.5 text-emerald-400/60 ml-auto flex-shrink-0" />
+                </div>
+              );
+            })}
+          </div>
+
+          {/* CTA */}
+          <button
+            onClick={() => navigate('/dashboard')}
+            className="w-full bg-gold-400 text-navy-950 font-semibold py-3.5 rounded-xl hover:bg-gold-300 transition-all shadow-lg shadow-gold-400/20 flex items-center justify-center gap-2 hover:-translate-y-0.5 active:scale-[0.98]"
+          >
+            Go to Dashboard
+            <ArrowRight className="w-4 h-4" />
+          </button>
         </div>
 
-        {/* Heading */}
-        <h1 className="text-3xl font-bold text-white mb-3 animate-slide-up-fade" style={{ animationDelay: '0.2s' }}>
-          Welcome to Pro! 🎉
-        </h1>
-        <p className="text-navy-300 mb-8 animate-slide-up-fade" style={{ animationDelay: '0.3s' }}>
-          Your <span className="text-gold-400 font-semibold">{planLabel}</span> subscription
-          is now active. Enjoy unlimited access to all BibleAI features.
+        {/* Subtle footer text */}
+        <p className="text-center text-[11px] text-navy-600 mt-4">
+          Having trouble? Email <a href="mailto:bibleaisupportcontact@gmail.com" className="text-navy-400 hover:text-white transition-colors underline">support</a>
         </p>
-
-        <div
-          className="bg-navy-900/80 border border-navy-800 rounded-2xl p-5 mb-8 animate-slide-up-fade backdrop-blur-sm"
-          style={{ animationDelay: '0.4s' }}
-        >
-          {confirmed ? (
-            <div className="flex items-center justify-center gap-3 text-emerald-400">
-              <CheckCircle className="w-5 h-5 flex-shrink-0" />
-              <span className="text-sm font-medium">
-                Subscription confirmed — your account is upgraded!
-              </span>
-            </div>
-          ) : polling ? (
-            <div className="flex items-center justify-center gap-3 text-gold-400">
-              <Loader2 className="w-5 h-5 animate-spin flex-shrink-0" />
-              <span className="text-sm text-navy-300">
-                Confirming your subscription&hellip; ({polls}/{MAX_POLLS})
-              </span>
-            </div>
-          ) : (
-            <div className="flex items-center justify-center gap-3 text-navy-400">
-              <Sparkles className="w-5 h-5 flex-shrink-0" />
-              <span className="text-sm">
-                Subscription is processing — it will reflect in a few seconds.
-              </span>
-            </div>
-          )}
-        </div>
-
-        {/* What's unlocked */}
-        <ul className="text-left space-y-3 mb-8 animate-slide-up-fade" style={{ animationDelay: '0.5s' }}>
-          {[
-            'Unlimited AI Bible Chat messages',
-            'Unlimited prayer journal entries',
-            'Prayer analytics & insights',
-            'Priority AI responses',
-            'Daily devotional archive',
-          ].map((feature, i) => (
-            <li
-              key={feature}
-              className="flex items-center gap-3 text-sm text-navy-200 animate-stagger-in"
-              style={{ animationDelay: `${0.6 + i * 0.1}s` }}
-            >
-              <CheckCircle className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-              {feature}
-            </li>
-          ))}
-        </ul>
-
-        <button
-          onClick={() => navigate('/dashboard')}
-          className="w-full bg-gold-400 text-navy-950 font-semibold py-3.5 rounded-xl hover:bg-gold-300 transition-all shadow-lg shadow-gold-400/20 flex items-center justify-center gap-2 animate-slide-up-fade hover:-translate-y-0.5 active:scale-[0.98]"
-          style={{ animationDelay: '0.7s' }}
-        >
-          <Sparkles className="w-5 h-5" />
-          Go to Dashboard
-        </button>
       </div>
     </div>
   );

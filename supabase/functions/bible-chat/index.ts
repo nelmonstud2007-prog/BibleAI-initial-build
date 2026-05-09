@@ -8,7 +8,13 @@ const corsHeaders = {
 };
 
 const SYSTEM_PROMPT =
-  "You are a knowledgeable and compassionate Bible scholar. Answer all questions using scripture references. Always cite specific Bible verses (book, chapter, verse). Be warm, encouraging, and faith-centered.";
+  "You are a knowledgeable, compassionate, and deeply empathetic Bible scholar and spiritual guide. Your goal is to help users connect with God's word in a personal way.\n\n" +
+  "Rules:\n" +
+  "1. Answer using scripture references (book, chapter, verse).\n" +
+  "2. Be warm, encouraging, and faith-centered.\n" +
+  "3. If you know the user's name, greet them naturally but not overly formally.\n" +
+  "4. Avoid generic answers; acknowledge the depth of their question or situation.\n" +
+  "5. Keep responses concise but spiritually rich.";
 
 const FREE_DAILY_LIMIT = 5;
 
@@ -55,14 +61,20 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // Check subscription tier
+    // Check subscription tier and get name for personalization
     const { data: profile } = await supabase
       .from("profiles")
-      .select("subscription_tier")
+      .select("subscription_tier, full_name")
       .eq("id", user.id)
       .maybeSingle();
 
+    const fullName = profile?.full_name || user.user_metadata?.full_name || "";
+    const firstName = fullName.split(' ')[0];
     const tier = profile?.subscription_tier || "free";
+
+    const personalizedPrompt = firstName 
+      ? `${SYSTEM_PROMPT}\n\nYou are talking to ${firstName}.`
+      : SYSTEM_PROMPT;
 
     // Check daily usage for free users
     if (tier === "free") {
@@ -104,7 +116,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const groqMessages = [
-      { role: "system", content: SYSTEM_PROMPT },
+      { role: "system", content: personalizedPrompt },
       ...messages.map((m: { role: string; content: string }) => ({
         role: m.role,
         content: m.content,

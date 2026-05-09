@@ -4,10 +4,6 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import {
   Send,
-  Bot,
-  User,
-  Cross,
-  Plus,
   MessageSquare,
   Trash2,
   X,
@@ -15,6 +11,11 @@ import {
   ChevronLeft,
   Loader2,
   Clock,
+  Plus,
+  Cross,
+  ChevronRight,
+  User,
+  Bot
 } from 'lucide-react';
 import UpgradeModal from '../../components/UpgradeModal';
 import { trackEvent } from '../../lib/analytics';
@@ -35,9 +36,6 @@ interface Conversation {
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-
-const SYSTEM_PROMPT =
-  'You are a knowledgeable and compassionate Bible scholar. Answer all questions using scripture references. Always cite specific Bible verses (book, chapter, verse). Be warm, encouraging, and faith-centered.';
 
 /** Cooldown duration in seconds after daily limit is exhausted (free tier). */
 const COOLDOWN_SECONDS = 120;
@@ -65,9 +63,9 @@ const formatMessageContent = (content: string, onVerseClick?: (ref: string) => v
       <button
         key={match.index}
         onClick={() => onVerseClick?.(ref)}
-        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gold-400/10 text-gold-400 font-bold border border-gold-400/20 mx-1 text-[11px] align-middle shadow-sm hover:bg-gold-400/20 transition-colors"
+        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gold-400/10 text-gold-400 font-bold border border-gold-400/20 mx-1 text-[11px] align-middle shadow-sm hover:bg-gold-400/20 transition-all active:scale-95"
       >
-        📖 {ref}
+        <span className="text-[14px]">📖</span> {ref}
       </button>
     );
     lastIndex = verseRegex.lastIndex;
@@ -100,10 +98,10 @@ const TypewriterMessage = ({
   }, [index, words, onComplete]);
 
   return (
-    <div className="whitespace-pre-wrap break-words">
+    <div className="whitespace-pre-wrap break-words leading-relaxed">
       {formatMessageContent(words.slice(0, index).join(' '), onVerseClick)}
       {index < words.length && (
-        <span className="inline-block w-1.5 h-4 bg-gold-400/50 ml-1 animate-pulse align-middle" />
+        <span className="inline-block w-1.5 h-4 bg-gold-400/50 ml-1 animate-pulse align-middle rounded-full" />
       )}
     </div>
   );
@@ -165,7 +163,6 @@ export default function BibleChat() {
   // ── Cooldown helpers ──────────────────────────────────────────────────────
 
   const startCooldown = useCallback((seconds = COOLDOWN_SECONDS) => {
-    // Clear any existing interval first
     if (cooldownRef.current) clearInterval(cooldownRef.current);
     setCooldownRemaining(seconds);
     setIsCooldownActive(true);
@@ -183,7 +180,6 @@ export default function BibleChat() {
     }, 1000);
   }, []);
 
-  // Clean up on unmount
   useEffect(() => {
     return () => {
       if (cooldownRef.current) clearInterval(cooldownRef.current);
@@ -206,8 +202,6 @@ export default function BibleChat() {
       });
     }
   };
-
-  // ── Scroll ────────────────────────────────────────────────────────────────
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -276,21 +270,16 @@ export default function BibleChat() {
 
   const fetchUsage = async () => {
     if (!user) return;
-    // If user is pro, we can short-circuit
     if (isPro) {
       setUsage({ used: 0, limit: null, tier: 'pro' });
       return;
     }
     const today = new Date().toISOString().split('T')[0];
-    const { data: profile, error: profileError } = await supabase
+    const { data: profile } = await supabase
       .from('profiles')
       .select('subscription_tier')
       .eq('id', user.id)
       .maybeSingle();
-    if (profileError) {
-      console.error('Failed to fetch usage profile:', profileError);
-      return;
-    }
 
     const tier = profile?.subscription_tier || 'free';
     const isPaidTier = tier === 'pro_monthly' || tier === 'pro_yearly' || tier === 'pro';
@@ -342,21 +331,16 @@ export default function BibleChat() {
     }
   };
 
-  // ── Send message ──────────────────────────────────────────────────────────
-
   const handleSend = async () => {
     const text = input.trim();
     if (!text || isTyping || isCooldownActive) return;
 
-    // Free-tier limit check
     if (!isPro && usage.limit !== null && usage.used >= usage.limit) {
-      // Show upgrade modal AND start cooldown timer
       setShowUpgradeModal(true);
       startCooldown(COOLDOWN_SECONDS);
       return;
     }
 
-    // Optimistic UI
     const userMessage: Message = {
       id: `temp-${Date.now()}`,
       role: 'user',
@@ -392,7 +376,6 @@ export default function BibleChat() {
         setIsTyping(false);
         const errBody = error.context as { error?: string; rate_limited?: boolean } | null;
         if (errBody?.rate_limited) {
-          // Groq provider-level rate limit — show friendly message in chat
           const rateLimitMsg: Message = {
             id: `err-${Date.now()}`,
             role: 'assistant',
@@ -400,10 +383,8 @@ export default function BibleChat() {
           };
           setMessages((prev) => [...prev, rateLimitMsg]);
         } else {
-          // Daily usage limit reached
           setUsage((prev) => ({ ...prev, used: prev.limit ?? 5 }));
           setShowUpgradeModal(true);
-          // Start cooldown so user can still try again after timer
           startCooldown(COOLDOWN_SECONDS);
         }
         return;
@@ -425,17 +406,11 @@ export default function BibleChat() {
 
       if (data.usage) {
         setUsage(data.usage);
-        // If limit just reached, start cooldown proactively
-        if (
-          data.usage.limit !== null &&
-          data.usage.used >= data.usage.limit &&
-          !isPro
-        ) {
+        if (data.usage.limit !== null && data.usage.used >= data.usage.limit && !isPro) {
           startCooldown(COOLDOWN_SECONDS);
         }
       }
 
-      // Update conversation title on first message
       if (messages.length === 0 && conversationId) {
         const title = text.length > 40 ? text.slice(0, 40) + '...' : text;
         await supabase
@@ -491,218 +466,218 @@ export default function BibleChat() {
   const usagePercent =
     usage.limit !== null ? Math.min((usage.used / usage.limit) * 100, 100) : 0;
 
-  // Is the input disabled?
   const inputDisabled = isTyping || isCooldownActive;
 
-  // ── Render ────────────────────────────────────────────────────────────────
-
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-screen overflow-hidden bg-navy-950">
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 bg-black/60 z-40 lg:hidden"
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm z-40 lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
       {/* ── Sidebar ───────────────────────────────────────────────────────── */}
       <aside
-        className={`fixed lg:static inset-y-0 left-0 z-50 w-72 bg-navy-900 border-r border-navy-800 flex flex-col transform transition-transform duration-200 ease-in-out lg:transform-none ${
+        className={`fixed lg:static inset-y-0 left-0 z-50 w-80 bg-navy-900 border-r border-navy-800/50 flex flex-col transform transition-transform duration-300 ease-in-out lg:transform-none ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         }`}
       >
-        <div className="p-3 border-b border-navy-800">
+        <div className="p-4 border-b border-navy-800/50">
           <button
             onClick={startNewChat}
-            className="w-full flex items-center gap-2 bg-gold-400/10 border border-gold-400/20 text-gold-400 font-medium px-4 py-2.5 rounded-xl hover:bg-gold-400/20 transition-colors text-sm"
+            className="w-full flex items-center justify-center gap-2 bg-gold-400 text-navy-950 font-bold px-4 py-3 rounded-2xl hover:bg-gold-300 transition-all shadow-lg shadow-gold-400/10 active:scale-95"
           >
-            <Plus className="w-4 h-4" />
-            New Chat
+            <Plus className="w-5 h-5" />
+            New Journey
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-2 space-y-1">
+        <div className="flex-1 overflow-y-auto p-3 space-y-2">
           {loadingConversations ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="w-6 h-6 border-2 border-gold-400 border-t-transparent rounded-full animate-spin" />
+            <div className="flex flex-col items-center justify-center py-12 space-y-3">
+              <Loader2 className="w-6 h-6 animate-spin text-gold-400" />
+              <span className="text-xs text-navy-500 font-medium tracking-widest uppercase">Loading history</span>
             </div>
           ) : conversations.length === 0 ? (
-            <div className="text-center py-8 px-4">
-              <MessageSquare className="w-8 h-8 text-navy-600 mx-auto mb-2" />
-              <p className="text-xs text-navy-400">No conversations yet</p>
+            <div className="text-center py-12 px-6">
+              <div className="w-12 h-12 bg-navy-800 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <MessageSquare className="w-6 h-6 text-navy-600" />
+              </div>
+              <p className="text-xs text-navy-400 leading-relaxed font-medium">Your spiritual conversations will appear here.</p>
             </div>
           ) : (
             conversations.map((conv) => (
               <div
                 key={conv.id}
-                className={`group flex flex-col gap-1 px-4 py-3 rounded-xl cursor-pointer transition-all border ${
+                className={`group flex flex-col gap-1 px-4 py-3.5 rounded-2xl cursor-pointer transition-all border ${
                   activeConversation?.id === conv.id
-                    ? 'bg-gold-400/10 border-gold-400/20 text-gold-400 shadow-lg shadow-gold-400/5'
-                    : 'text-navy-300 border-transparent hover:bg-navy-800/50 hover:text-white'
+                    ? 'bg-navy-800 border-gold-400/30 text-white shadow-xl shadow-black/20'
+                    : 'text-navy-400 border-transparent hover:bg-navy-800/40 hover:text-navy-200'
                 }`}
                 onClick={() => selectConversation(conv)}
               >
-                <div className="flex items-center gap-2">
-                  <MessageSquare className="w-4 h-4 flex-shrink-0" />
-                  <span className="text-sm truncate flex-1 font-medium">{conv.title}</span>
+                <div className="flex items-center gap-3">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                    activeConversation?.id === conv.id ? 'bg-gold-400/10 text-gold-400' : 'bg-navy-800/50 text-navy-600'
+                  }`}>
+                    <MessageSquare className="w-4 h-4" />
+                  </div>
+                  <span className="text-sm truncate flex-1 font-semibold">{conv.title}</span>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       deleteConversation(conv.id);
                     }}
-                    className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-400 transition-all"
+                    className="opacity-0 group-hover:opacity-100 p-1.5 hover:text-red-400 transition-all hover:bg-red-400/10 rounded-lg"
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
+                    <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
-                <span className="text-[10px] text-navy-500 pl-6">
-                  {new Date(conv.updated_at).toLocaleDateString()}
-                </span>
+                <div className="flex items-center gap-2 pl-11">
+                  <Clock className="w-3 h-3 text-navy-600" />
+                  <span className="text-[10px] text-navy-600 font-bold uppercase tracking-wider">
+                    {new Date(conv.updated_at).toLocaleDateString()}
+                  </span>
+                </div>
               </div>
             ))
           )}
         </div>
 
-        {/* Usage counter */}
-        <div className="p-3 border-t border-navy-800">
+        {/* Usage section */}
+        <div className="p-5 border-t border-navy-800/50 bg-navy-900/50">
           {!isPro && usage.limit !== null ? (
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xs text-navy-400">Daily Messages</span>
-                <span className="text-xs font-medium text-navy-200">
-                  {usage.used}/{usage.limit}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-gold-400" />
+                  <span className="text-xs font-bold text-navy-300 uppercase tracking-wider">Usage</span>
+                </div>
+                <span className="text-xs font-bold text-white">
+                  {usage.used} <span className="text-navy-500">/</span> {usage.limit}
                 </span>
               </div>
-              <div className="w-full h-1.5 bg-navy-800 rounded-full overflow-hidden">
+              <div className="h-2 bg-navy-800 rounded-full overflow-hidden p-[2px]">
                 <div
-                  className={`h-full rounded-full transition-all duration-300 ${
-                    usagePercent >= 100
-                      ? 'bg-red-400'
-                      : usagePercent >= 80
-                        ? 'bg-amber-400'
-                        : 'bg-gold-400'
+                  className={`h-full rounded-full transition-all duration-1000 ease-out shadow-[0_0_8px_rgba(251,191,36,0.2)] ${
+                    usagePercent >= 100 ? 'bg-red-500' : usagePercent >= 80 ? 'bg-amber-500' : 'bg-gold-gradient'
                   }`}
                   style={{ width: `${usagePercent}%` }}
                 />
               </div>
-              {usage.used >= (usage.limit ?? 0) && (
-                <button
-                  onClick={() => setShowUpgradeModal(true)}
-                  className="mt-2 w-full text-xs text-gold-400 hover:text-gold-300 font-medium transition-colors"
-                >
-                  Upgrade for unlimited messages
-                </button>
-              )}
+              <button
+                onClick={() => setShowUpgradeModal(true)}
+                className="w-full bg-navy-800 border border-gold-400/20 text-gold-400 text-[11px] font-bold py-2.5 rounded-xl hover:bg-gold-400 hover:text-navy-950 transition-all uppercase tracking-widest"
+              >
+                Go Unlimited
+              </button>
             </div>
           ) : (
-            <div className="flex items-center gap-1.5 text-xs text-emerald-400">
-              <Sparkles className="w-3.5 h-3.5" />
-              <span className="font-medium">Pro — Unlimited</span>
+            <div className="flex items-center justify-between bg-gold-400/5 border border-gold-400/20 p-4 rounded-2xl">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-gold-gradient rounded-xl flex items-center justify-center shadow-lg shadow-gold-400/20">
+                  <Sparkles className="w-5 h-5 text-navy-950" />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-white">Pro Status</p>
+                  <p className="text-[10px] font-medium text-gold-400 uppercase tracking-widest">Unlimited Chat</p>
+                </div>
+              </div>
             </div>
           )}
         </div>
       </aside>
 
-      {/* ── Main chat ─────────────────────────────────────────────────────── */}
-      <div className="flex-1 flex flex-col min-w-0">
+      {/* ── Main Chat ── */}
+      <div className="flex-1 flex flex-col min-w-0 relative">
         {/* Header */}
-        <div className="flex items-center gap-3 px-4 sm:px-6 py-4 border-b border-gold-400/20 bg-navy-950/80 backdrop-blur-md relative z-20">
+        <header className="flex items-center gap-4 px-6 py-5 border-b border-navy-800/50 bg-navy-950/80 backdrop-blur-xl relative z-20">
           <button
             onClick={() => setSidebarOpen(true)}
-            className="lg:hidden text-navy-300 hover:text-white p-1 transition-colors"
+            className="lg:hidden text-navy-400 hover:text-white p-2 hover:bg-navy-800 rounded-xl transition-all"
           >
-            <ChevronLeft className="w-5 h-5" />
+            <ChevronLeft className="w-6 h-6" />
           </button>
-          <div className="w-10 h-10 bg-gold-400/10 rounded-xl flex items-center justify-center border border-gold-400/20 shadow-lg shadow-gold-400/5">
-            <Cross className="w-5 h-5 text-gold-400" />
+          
+          <div className="w-12 h-12 bg-navy-900 border border-gold-400/30 rounded-2xl flex items-center justify-center shadow-2xl relative group">
+             <div className="absolute inset-0 bg-gold-400/10 rounded-2xl blur-md group-hover:bg-gold-400/20 transition-all" />
+             <Cross className="w-6 h-6 text-gold-400 relative z-10" />
           </div>
+
           <div className="flex-1 min-w-0">
-            <h1 className="text-base font-bold text-white truncate">
+            <h1 className="text-lg font-bold text-white truncate tracking-tight">
               {activeConversation?.title || 'Bible Chat'}
             </h1>
-            <p className="text-[11px] text-navy-400 flex items-center gap-1.5 uppercase tracking-wider font-medium">
-              {isTyping && <Loader2 className="w-3 h-3 animate-spin text-gold-400" />}
-              {isTyping ? 'BibleAI is preparing a response...' : 'Pro Bible Scholar'}
-            </p>
-          </div>
-          {!isPro && usage.limit !== null && (
-            <div
-              className={`sm:hidden px-2.5 py-1 rounded-full text-[10px] font-bold border ${
-                usage.used >= usage.limit
-                  ? 'bg-red-400/10 text-red-400 border-red-400/20'
-                  : 'bg-navy-800 text-navy-300 border-navy-700'
-              }`}
-            >
-              {usage.used}/{usage.limit}
+            <div className="flex items-center gap-2 mt-0.5">
+              <div className={`w-2 h-2 rounded-full ${isTyping ? 'bg-gold-400 animate-pulse' : 'bg-emerald-500'}`} />
+              <span className="text-[11px] font-bold text-navy-400 uppercase tracking-widest">
+                {isTyping ? 'Thinking...' : 'AI Bible Scholar'}
+              </span>
             </div>
-          )}
-        </div>
+          </div>
+        </header>
 
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto pb-36 lg:pb-0">
+        {/* Messages Content */}
+        <div className="flex-1 overflow-y-auto pb-40 lg:pb-8">
           {messages.length === 0 && !loadingMessages ? (
-            <div className="flex flex-col items-center justify-center h-full px-4 py-12 animate-fade-in-up">
-              <div className="w-20 h-20 bg-gold-400/10 rounded-3xl flex items-center justify-center mb-6 border border-gold-400/20 shadow-2xl shadow-gold-400/5">
-                <Cross className="w-10 h-10 text-gold-400" />
+            <div className="max-w-2xl mx-auto px-6 pt-12 lg:pt-20 text-center animate-slide-up-fade">
+              <div className="w-24 h-24 bg-gold-400/5 border border-gold-400/10 rounded-[2rem] flex items-center justify-center mx-auto mb-8 shadow-2xl animate-float">
+                <Bot className="w-12 h-12 text-gold-400" />
               </div>
-              <h2 className="text-2xl font-bold text-white mb-3">Faith Journey Begins</h2>
-              <p className="text-sm text-navy-300 text-center max-w-md mb-10 leading-relaxed">
-                Ask anything about scripture, theology, prayer, or how to apply God&apos;s Word to
-                your life today.
+              <h2 className="text-3xl font-bold text-white mb-4 tracking-tight">Spirit-Led Conversations</h2>
+              <p className="text-navy-300 text-lg mb-12 leading-relaxed">
+                Explore the depth of scripture, find comfort in God&apos;s promises, and grow in your spiritual walk through AI-guided biblical insights.
               </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-xl">
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-left">
                 {[
-                  'What does the Bible say about anxiety?',
-                  'How do I forgive someone?',
-                  'What is the meaning of John 3:16?',
-                  'How can I grow in my prayer life?',
-                ].map((suggestion) => (
+                  { icon: '🙏', text: 'How do I deepen my prayer life?' },
+                  { icon: '💡', text: 'Explain the concept of grace' },
+                  { icon: '🌊', text: 'Verses for finding peace' },
+                  { icon: '✨', text: 'Meaning of John 3:16' }
+                ].map((item, i) => (
                   <button
-                    key={suggestion}
-                    onClick={() => {
-                      setInput(suggestion);
-                      inputRef.current?.focus();
-                    }}
-                    className="text-left bg-navy-900/40 border border-navy-800 rounded-2xl px-5 py-4 text-sm text-navy-200 hover:text-white hover:border-gold-400/30 hover:bg-navy-900/60 hover:-translate-y-1 transition-all duration-300 shadow-lg shadow-black/20"
+                    key={i}
+                    onClick={() => { setInput(item.text); inputRef.current?.focus(); }}
+                    className="group bg-navy-900/40 border border-navy-800/50 rounded-2xl p-5 hover:bg-navy-800/60 hover:border-gold-400/30 transition-all duration-300 flex items-center gap-4 shadow-xl shadow-black/20"
+                    style={{ animationDelay: `${i * 0.1}s` }}
                   >
-                    {suggestion}
+                    <span className="text-2xl grayscale group-hover:grayscale-0 transition-all duration-300">{item.icon}</span>
+                    <span className="text-sm font-semibold text-navy-200 group-hover:text-white transition-colors">{item.text}</span>
+                    <ChevronRight className="w-4 h-4 text-navy-600 ml-auto group-hover:text-gold-400 group-hover:translate-x-1 transition-all" />
                   </button>
                 ))}
               </div>
             </div>
           ) : (
-            <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8 pb-24 lg:pb-8 space-y-8">
+            <div className="max-w-4xl mx-auto px-6 py-10 space-y-10">
               {messages.map((message, idx) => {
                 const isAI = message.role === 'assistant';
-                const userName = user?.user_metadata?.full_name || user?.email || 'User';
+                const userName = user?.user_metadata?.full_name || user?.email || 'Disciple';
                 const userInitial = userName.charAt(0).toUpperCase();
 
                 return (
                   <div
                     key={message.id}
-                    className={`flex gap-4 animate-fade-in-up group ${!isAI ? 'flex-row-reverse' : ''}`}
+                    className={`flex gap-4 sm:gap-6 animate-slide-up-fade ${!isAI ? 'flex-row-reverse' : ''}`}
                     style={{ animationDelay: `${idx * 0.05}s` }}
                   >
-                    <div
-                      className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 border shadow-md transition-transform group-hover:scale-110 ${
-                        isAI
-                          ? 'bg-navy-950 border-gold-400/30 text-xl'
-                          : 'bg-gold-400 text-navy-950 font-bold border-gold-300'
-                      }`}
-                    >
-                      {isAI ? '📖' : userInitial}
+                    {/* Avatar */}
+                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 border-2 shadow-2xl transition-all duration-500 group ${
+                      isAI ? 'bg-navy-900 border-gold-400/20' : 'bg-gold-gradient border-gold-300 text-navy-950 font-bold'
+                    }`}>
+                      {isAI ? <Bot className="w-6 h-6 text-gold-400" /> : <span className="text-xl">{userInitial}</span>}
                     </div>
-                    <div
-                      className={`flex flex-col ${!isAI ? 'items-end' : 'items-start'} max-w-[85%] sm:max-w-[75%]`}
-                    >
-                      <div
-                        className={`relative rounded-2xl px-5 py-4 text-[15px] leading-relaxed shadow-xl transition-all ${
-                          isAI
-                            ? 'bg-navy-900/90 border border-gold-400/10 text-navy-100 rounded-tl-none'
-                            : 'bg-gold-gradient border border-gold-500/30 text-navy-950 font-medium rounded-tr-none'
-                        }`}
-                      >
+
+                    {/* Bubble */}
+                    <div className={`flex flex-col ${!isAI ? 'items-end' : 'items-start'} max-w-[85%] sm:max-w-[75%]`}>
+                      <div className={`relative px-6 py-5 rounded-[2rem] text-[15px] leading-relaxed shadow-2xl transition-all duration-500 ${
+                        isAI 
+                          ? 'bg-navy-900/60 backdrop-blur-md border border-white/5 text-navy-100 rounded-tl-none' 
+                          : 'bg-navy-800 border border-navy-700 text-white rounded-tr-none'
+                      }`}>
                         {isAI && idx === messages.length - 1 && !isTyping ? (
                           <TypewriterMessage
                             content={message.content}
@@ -711,41 +686,34 @@ export default function BibleChat() {
                           />
                         ) : (
                           <div className="whitespace-pre-wrap break-words">
-                            {isAI
-                              ? formatMessageContent(message.content, handleVerseClick)
-                              : message.content}
+                            {isAI ? formatMessageContent(message.content, handleVerseClick) : message.content}
                           </div>
                         )}
                       </div>
-                      <span className="mt-1.5 text-[10px] text-navy-500 font-medium opacity-0 group-hover:opacity-100 transition-opacity">
-                        {message.created_at
-                          ? new Date(message.created_at).toLocaleTimeString([], {
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })
-                          : 'Just now'}
-                      </span>
+                      <div className="flex items-center gap-2 mt-2 px-2">
+                        <span className="text-[10px] font-bold text-navy-600 uppercase tracking-widest">
+                          {isAI ? 'Bible Scholar' : userName.split(' ')[0]}
+                        </span>
+                        <span className="w-1 h-1 bg-navy-800 rounded-full" />
+                        <span className="text-[10px] font-bold text-navy-700 uppercase tracking-widest">
+                          {message.created_at ? new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Now'}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 );
               })}
 
               {isTyping && (
-                <div className="flex gap-4 animate-fade-in-up">
-                  <div className="w-10 h-10 bg-navy-950 border border-gold-400/20 rounded-full flex items-center justify-center flex-shrink-0 shadow-md">
-                    <Cross className="w-5 h-5 text-gold-400" />
+                <div className="flex gap-4 sm:gap-6 animate-slide-up-fade">
+                  <div className="w-12 h-12 bg-navy-900 border border-gold-400/20 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-2xl">
+                    <Loader2 className="w-6 h-6 animate-spin text-gold-400" />
                   </div>
-                  <div className="bg-navy-900/90 border border-navy-800 rounded-2xl px-5 py-4 shadow-xl">
+                  <div className="bg-navy-900/40 backdrop-blur-md border border-white/5 rounded-[2rem] px-8 py-5 shadow-2xl rounded-tl-none">
                     <div className="flex gap-2">
-                      <span className="w-2 h-2 bg-gold-400/60 rounded-full animate-pulse-typing" />
-                      <span
-                        className="w-2 h-2 bg-gold-400/60 rounded-full animate-pulse-typing"
-                        style={{ animationDelay: '0.2s' }}
-                      />
-                      <span
-                        className="w-2 h-2 bg-gold-400/60 rounded-full animate-pulse-typing"
-                        style={{ animationDelay: '0.4s' }}
-                      />
+                      <div className="w-2.5 h-2.5 bg-gold-400 rounded-full animate-pulse-typing" />
+                      <div className="w-2.5 h-2.5 bg-gold-400 rounded-full animate-pulse-typing [animation-delay:0.2s]" />
+                      <div className="w-2.5 h-2.5 bg-gold-400 rounded-full animate-pulse-typing [animation-delay:0.4s]" />
                     </div>
                   </div>
                 </div>
@@ -756,91 +724,65 @@ export default function BibleChat() {
           )}
         </div>
 
-        {/* ── Input area ────────────────────────────────────────────────── */}
-        <div className="fixed lg:static bottom-0 left-0 right-0 z-30 border-t border-gold-400/10 bg-navy-950/95 backdrop-blur-md px-4 sm:px-6 py-4 lg:py-6 pb-[calc(env(safe-area-inset-bottom)+16px)] lg:pb-8">
-          <div className="max-w-3xl mx-auto relative">
-            {/* ── Cooldown timer banner ── */}
+        {/* ── Input Bar ── */}
+        <div className="fixed lg:absolute bottom-0 left-0 right-0 z-30 p-4 sm:p-6 lg:p-8 bg-gradient-to-t from-navy-950 via-navy-950/90 to-transparent">
+          <div className="max-w-4xl mx-auto">
+            
             {isCooldownActive && (
-              <div className="mb-3 flex items-center justify-center gap-2 bg-amber-400/10 border border-amber-400/20 rounded-xl px-4 py-2.5 animate-fade-in-up">
-                <Clock className="w-4 h-4 text-amber-400 flex-shrink-0 animate-pulse" />
-                <span className="text-sm text-amber-300 font-medium">
-                  You&apos;re on cooldown:{' '}
-                  <span className="font-mono font-bold text-amber-400">
-                    {formatCountdown(cooldownRemaining)}
-                  </span>{' '}
-                  remaining
-                </span>
+              <div className="mb-4 flex items-center justify-center gap-3 bg-amber-500/10 border border-amber-500/20 rounded-2xl px-6 py-3.5 animate-slide-up-fade shadow-xl">
+                <div className="w-8 h-8 rounded-full bg-amber-500/10 flex items-center justify-center animate-glow-pulse">
+                  <Clock className="w-4 h-4 text-amber-500" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm text-amber-200 font-bold tracking-tight">Daily message limit reached</p>
+                  <p className="text-[11px] text-amber-500/80 font-bold uppercase tracking-wider">Cooldown: {formatCountdown(cooldownRemaining)} remaining</p>
+                </div>
                 <button
                   onClick={() => setShowUpgradeModal(true)}
-                  className="ml-auto text-xs text-gold-400 hover:text-gold-300 font-semibold underline transition-colors"
+                  className="bg-amber-500 text-navy-950 text-xs font-black px-4 py-2 rounded-xl hover:bg-amber-400 transition-all uppercase tracking-tighter"
                 >
-                  Upgrade
+                  Upgrade Now
                 </button>
               </div>
             )}
 
-            <div
-              className={`flex items-center gap-3 bg-navy-900 border rounded-full pl-6 pr-2 py-2 transition-all duration-300 shadow-2xl shadow-black/40 ${
-                isCooldownActive
-                  ? 'border-amber-400/30 opacity-70'
-                  : 'border-navy-800 focus-within:border-gold-400/40 focus-within:ring-1 focus-within:ring-gold-400/20'
-              }`}
-            >
+            <div className={`flex items-end gap-3 bg-navy-900/80 backdrop-blur-2xl border-2 rounded-[2.5rem] p-3 transition-all duration-500 shadow-[0_32px_64px_-12px_rgba(0,0,0,0.5)] ${
+              isCooldownActive ? 'border-amber-500/20 opacity-50' : 'border-white/5 focus-within:border-gold-400/40 focus-within:shadow-[0_0_40px_rgba(251,191,36,0.1)]'
+            }`}>
               <textarea
                 ref={inputRef}
                 value={input}
                 onChange={handleInputChange}
                 onKeyDown={handleKeyDown}
                 disabled={inputDisabled}
-                placeholder={
-                  isCooldownActive
-                    ? `Cooldown active — ${formatCountdown(cooldownRemaining)} remaining`
-                    : placeholders[placeholderIndex]
-                }
+                placeholder={isCooldownActive ? 'Wait for cooldown...' : placeholders[placeholderIndex]}
+                className="flex-1 bg-transparent border-none focus:ring-0 text-white placeholder-navy-600 py-3 pl-4 pr-2 text-[15px] resize-none max-h-40 font-medium scrollbar-none"
                 rows={1}
-                maxLength={1000}
-                className="flex-1 bg-transparent text-[15px] text-white placeholder-navy-500 focus:outline-none resize-none max-h-40 leading-relaxed disabled:opacity-60 py-2"
               />
-              <div className="flex items-center gap-3 pr-1">
-                {input.length > 200 && (
-                  <span
-                    className={`text-[10px] font-bold transition-colors tabular-nums ${
-                      input.length > 900 ? 'text-amber-400' : 'text-navy-500'
-                    }`}
-                  >
-                    {input.length}/1000
-                  </span>
-                )}
-                <button
-                  onClick={handleSend}
-                  disabled={!input.trim() || inputDisabled}
-                  title={isCooldownActive ? `Cooldown: ${formatCountdown(cooldownRemaining)}` : 'Send'}
-                  className="bg-gold-gradient text-navy-950 p-3 rounded-full hover:scale-110 active:scale-95 transition-all disabled:opacity-20 disabled:grayscale disabled:cursor-not-allowed flex-shrink-0 shadow-lg shadow-gold-400/20"
-                >
-                  {isTyping ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                  ) : isCooldownActive ? (
-                    <Clock className="w-5 h-5" />
-                  ) : (
-                    <Send className="w-5 h-5" />
-                  )}
-                </button>
-              </div>
+              <button
+                onClick={handleSend}
+                disabled={inputDisabled || !input.trim()}
+                className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 shadow-xl ${
+                  input.trim() && !inputDisabled
+                    ? 'bg-gold-gradient text-navy-950 hover:scale-110 rotate-0'
+                    : 'bg-navy-800 text-navy-600 -rotate-45'
+                }`}
+              >
+                <Send className="w-5 h-5" />
+              </button>
             </div>
-            <p className="text-[11px] text-navy-500 mt-3 text-center font-medium">
-              <Sparkles className="w-3 h-3 inline-block mr-1 text-gold-400/60" />
-              BibleAI provides faith-centered guidance. Verify with your personal study.
+            
+            <p className="text-center text-[10px] text-navy-600 mt-4 font-bold uppercase tracking-widest">
+              Guided by Scripture &bull; Compassionate Wisdom
             </p>
           </div>
         </div>
       </div>
 
-      {/* Upgrade Modal */}
-      <UpgradeModal
-        open={showUpgradeModal}
+      <UpgradeModal 
+        open={showUpgradeModal} 
         onClose={() => setShowUpgradeModal(false)}
         limitType="ai_messages"
-        limitDetail={`${usage.used} of ${usage.limit} daily messages used`}
       />
     </div>
   );

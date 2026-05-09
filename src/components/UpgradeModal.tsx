@@ -1,6 +1,6 @@
 import { useAuth } from '../context/AuthContext';
-import { X, Sparkles, Crown, Check, Loader2 } from 'lucide-react';
-import { useState } from 'react';
+import { X, Sparkles, Crown, Check, Loader2, Zap, Star, ShieldCheck } from 'lucide-react';
+import { useState, useEffect } from 'react';
 import { trackEvent } from '../lib/analytics';
 
 interface UpgradeModalProps {
@@ -11,17 +11,26 @@ interface UpgradeModalProps {
 }
 
 const PRO_FEATURES = [
-  'Unlimited AI Bible Chat messages',
-  'Unlimited prayer journal entries',
-  'Prayer analytics & insights',
-  'Priority AI responses',
-  'Daily devotional archive',
+  { icon: Zap, label: 'Unlimited AI Bible Chat messages' },
+  { icon: Star, label: 'Unlimited prayer journal entries' },
+  { icon: Zap, label: 'Prayer analytics & insights' },
+  { icon: Sparkles, label: 'Priority AI responses' },
+  { icon: ShieldCheck, label: 'Daily devotional archive' },
 ];
 
 export default function UpgradeModal({ open, onClose, limitType, limitDetail }: UpgradeModalProps) {
   const { session, isPro } = useAuth();
   const [loading, setLoading] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'yearly'>('yearly');
+  const [isAnimating, setIsAnimating] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setIsAnimating(true);
+    } else {
+      setIsAnimating(false);
+    }
+  }, [open]);
 
   if (!open || isPro) return null;
 
@@ -65,92 +74,118 @@ export default function UpgradeModal({ open, onClose, limitType, limitDetail }: 
         : 'Unlock the full experience';
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center px-4">
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-navy-900 border border-navy-800 rounded-2xl p-6 sm:p-8 max-w-lg w-full shadow-2xl animate-scale-in">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center px-4 overflow-hidden">
+      <div 
+        className={`absolute inset-0 bg-navy-950/80 backdrop-blur-md transition-opacity duration-500 ${isAnimating ? 'opacity-100' : 'opacity-0'}`} 
+        onClick={onClose} 
+      />
+      
+      {/* Background Glow */}
+      <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-gold-400/20 rounded-full blur-[120px] pointer-events-none transition-all duration-1000 ${isAnimating ? 'opacity-100 scale-100' : 'opacity-0 scale-50'}`} />
+
+      <div className={`relative bg-navy-900 border border-white/10 rounded-[2.5rem] p-8 sm:p-10 max-w-lg w-full shadow-[0_32px_64px_-12px_rgba(0,0,0,0.6)] transition-all duration-500 ${isAnimating ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-10 scale-95'}`}>
+        
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 text-navy-400 hover:text-white transition-colors"
+          className="absolute top-6 right-6 text-navy-400 hover:text-white transition-all hover:rotate-90"
         >
-          <X className="w-5 h-5" />
+          <X className="w-6 h-6" />
         </button>
 
-        <div className="text-center mb-6">
-          <div className="w-14 h-14 bg-gold-400/10 rounded-2xl flex items-center justify-center mx-auto mb-5">
-            <Crown className="w-7 h-7 text-gold-400" />
+        <div className="text-center mb-8">
+          <div className="w-20 h-20 bg-gold-gradient rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-xl shadow-gold-400/20 animate-glow-pulse">
+            <Crown className="w-10 h-10 text-navy-950" />
           </div>
-          <h2 className="text-xl font-bold text-white mb-2">Upgrade to Pro</h2>
-          <p className="text-sm text-navy-300">
+          <h2 className="text-3xl font-bold text-white mb-3 tracking-tight">Upgrade to <span className="text-gold-gradient bg-clip-text text-transparent">Pro</span></h2>
+          <p className="text-navy-300">
             {limitMessage}
-            {limitDetail && <span className="block mt-1 text-xs text-navy-400">{limitDetail}</span>}
+            {limitDetail && <span className="block mt-2 text-xs font-medium text-gold-400/80 uppercase tracking-widest">{limitDetail}</span>}
           </p>
         </div>
 
         {/* Plan selector */}
-        <div className="grid grid-cols-2 gap-3 mb-6">
+        <div className="grid grid-cols-2 gap-4 mb-8">
           <button
             onClick={() => setSelectedPlan('monthly')}
-            className={`relative p-4 rounded-xl border text-left transition-all ${
+            className={`group relative p-6 rounded-3xl border transition-all duration-300 text-left ${
               selectedPlan === 'monthly'
-                ? 'border-gold-400/40 bg-gold-400/5'
-                : 'border-navy-700 bg-navy-800/50 hover:border-navy-600'
+                ? 'border-gold-400/50 bg-gold-400/5 shadow-lg shadow-gold-400/5'
+                : 'border-navy-800 bg-navy-800/40 hover:border-navy-700'
             }`}
           >
-            <p className="text-xs text-navy-400 mb-1">Monthly</p>
-            <p className="text-xl font-bold text-white">$4.99</p>
-            <p className="text-xs text-navy-400">/month</p>
+            <p className={`text-xs font-bold uppercase tracking-widest mb-2 ${selectedPlan === 'monthly' ? 'text-gold-400' : 'text-navy-500'}`}>Monthly</p>
+            <div className="flex items-baseline gap-1">
+              <span className="text-2xl font-bold text-white">$4.99</span>
+              <span className="text-xs text-navy-400">/mo</span>
+            </div>
           </button>
+          
           <button
             onClick={() => setSelectedPlan('yearly')}
-            className={`relative p-4 rounded-xl border text-left transition-all ${
+            className={`group relative p-6 rounded-3xl border transition-all duration-300 text-left ${
               selectedPlan === 'yearly'
-                ? 'border-gold-400/40 bg-gold-400/5'
-                : 'border-navy-700 bg-navy-800/50 hover:border-navy-600'
+                ? 'border-gold-400/50 bg-gold-400/5 shadow-lg shadow-gold-400/5'
+                : 'border-navy-800 bg-navy-800/40 hover:border-navy-700'
             }`}
           >
-            <div className="absolute -top-2 right-3 bg-emerald-400 text-navy-950 text-[9px] font-bold px-2 py-0.5 rounded-md">
+            <div className="absolute -top-3 right-4 bg-gold-gradient text-navy-950 text-[10px] font-bold px-3 py-1 rounded-full shadow-lg">
               SAVE 33%
             </div>
-            <p className="text-xs text-navy-400 mb-1">Yearly</p>
-            <p className="text-xl font-bold text-white">$39.99</p>
-            <p className="text-xs text-navy-400">/year ($3.33/mo)</p>
+            <p className={`text-xs font-bold uppercase tracking-widest mb-2 ${selectedPlan === 'yearly' ? 'text-gold-400' : 'text-navy-500'}`}>Yearly</p>
+            <div className="flex items-baseline gap-1">
+              <span className="text-2xl font-bold text-white">$39.99</span>
+              <span className="text-xs text-navy-400">/yr</span>
+            </div>
+            <p className="text-[10px] text-navy-500 mt-1">$3.33 per month</p>
           </button>
         </div>
 
-        {/* Features */}
-        <div className="bg-navy-800/50 border border-navy-700 rounded-xl p-4 mb-6">
-          <p className="text-sm font-semibold text-gold-400 mb-3">Everything in Pro</p>
-          <ul className="space-y-2">
-            {PRO_FEATURES.map((feature) => (
-              <li key={feature} className="flex items-start gap-2 text-sm text-navy-200">
-                <Check className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
-                {feature}
-              </li>
-            ))}
+        {/* Features list */}
+        <div className="bg-navy-800/30 border border-navy-800/50 rounded-3xl p-6 mb-8">
+          <ul className="space-y-4">
+            {PRO_FEATURES.map((feature, i) => {
+              const Icon = feature.icon;
+              return (
+                <li 
+                  key={feature.label} 
+                  className="flex items-center gap-3 text-sm text-navy-200 animate-slide-up-fade"
+                  style={{ animationDelay: `${0.1 + i * 0.05}s` }}
+                >
+                  <div className="w-5 h-5 rounded-full bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
+                    <Check className="w-3 h-3 text-emerald-400" />
+                  </div>
+                  {feature.label}
+                </li>
+              );
+            })}
           </ul>
         </div>
 
-        {/* CTA */}
+        {/* Action button */}
         <button
           onClick={handleUpgrade}
           disabled={loading}
-          className="w-full bg-gold-400 text-navy-950 font-semibold py-3 rounded-xl hover:bg-gold-300 transition-colors shadow-lg shadow-gold-400/20 flex items-center justify-center gap-2 disabled:opacity-60"
+          className="group relative w-full h-14 bg-gold-gradient rounded-2xl overflow-hidden shadow-xl shadow-gold-400/20 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
         >
-          {loading ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin" />
-              Redirecting...
-            </>
-          ) : (
-            <>
-              <Sparkles className="w-4 h-4" />
-              Upgrade to Pro
-            </>
-          )}
+          <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+          <div className="relative flex items-center justify-center gap-3">
+            {loading ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin text-navy-950" />
+                <span className="font-bold text-navy-950">Redirecting to Stripe...</span>
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-5 h-5 text-navy-950" />
+                <span className="font-bold text-navy-950 text-lg">Get BibleAI Pro</span>
+              </>
+            )}
+          </div>
         </button>
+        
         <button
           onClick={onClose}
-          className="w-full text-sm text-navy-400 hover:text-white transition-colors py-2 mt-1"
+          className="w-full text-center text-sm font-medium text-navy-500 hover:text-navy-300 transition-colors mt-6"
         >
           Maybe later
         </button>

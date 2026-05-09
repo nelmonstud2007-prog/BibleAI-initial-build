@@ -20,7 +20,7 @@ interface AuthContextType {
   profileCompleted: boolean;
   limits: UsageLimits | null;
   refreshLimits: () => Promise<void>;
-  refreshProfile: () => Promise<void>;
+  refreshProfile: () => Promise<SubscriptionTier>;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: string | null }>;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
@@ -69,9 +69,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   /** Exposed so pages like UpgradeSuccess can force-refresh after payment */
-  const refreshProfile = useCallback(async () => {
-    if (!user) return;
-    await fetchProfile(user.id);
+  const refreshProfile = useCallback(async (): Promise<SubscriptionTier> => {
+    if (!user) return 'free';
+    return await fetchProfile(user.id);
   }, [user, fetchProfile]);
 
   const refreshLimits = useCallback(async () => {
