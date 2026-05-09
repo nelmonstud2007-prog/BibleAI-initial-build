@@ -126,11 +126,12 @@ function FAQItem({ question, answer }: { question: string; answer: string }) {
   );
 }
 
-function AnimatedSection({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+function AnimatedSection({ children, className = '', id }: { children: React.ReactNode; className?: string; id?: string }) {
   const { ref, inView } = useInView({ triggerOnce: true, threshold: 0.1 });
   return (
     <div
       ref={ref}
+      id={id}
       className={`transition-all duration-1000 ease-out ${inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'} ${className}`}
     >
       {children}
@@ -172,6 +173,10 @@ export default function Landing() {
             <a href="#features" className="text-sm font-semibold text-navy-300 hover:text-white transition-colors">Features</a>
             <a href="#demo" className="text-sm font-semibold text-navy-300 hover:text-white transition-colors">How it works</a>
             <a href="#pricing" className="text-sm font-semibold text-navy-300 hover:text-white transition-colors">Pricing</a>
+            <div className="flex items-center gap-2 px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full">
+               <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+               <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Live Status</span>
+            </div>
           </div>
 
           <div className="flex items-center gap-6">
@@ -202,12 +207,12 @@ export default function Landing() {
           </div>
 
           <h1 className="text-5xl sm:text-7xl lg:text-8xl font-bold text-white leading-[0.9] tracking-tighter mb-8 animate-slide-up-fade">
-            Faith Meets <br />
-            <span className="text-gold-gradient">Intelligence</span>
+            Your Bible. <br />
+            <span className="text-gold-gradient">Smarter.</span>
           </h1>
 
-          <p className="max-w-2xl mx-auto text-lg sm:text-xl text-navy-200 mb-12 leading-relaxed animate-slide-up-fade [animation-delay:0.2s]">
-            BibleAI is your personal scripture companion. Ask questions, log prayers, and deepen your walk with God through advanced AI built on biblical truth.
+          <p className="max-w-xl mx-auto text-lg sm:text-xl text-navy-200 mb-12 leading-relaxed animate-slide-up-fade [animation-delay:0.2s]">
+            Ask questions, log prayers, and grow closer to God with an AI companion built on biblical truth.
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-6 animate-slide-up-fade [animation-delay:0.4s]">
@@ -280,18 +285,17 @@ export default function Landing() {
                 Real-time Intelligence
               </div>
               <h2 className="text-4xl sm:text-6xl font-bold text-white leading-tight">
-                An AI that <br />
-                <span className="text-gold-gradient font-serif italic">Knows the Word</span>
+                Understand scripture like never before.
               </h2>
-              <p className="text-lg text-navy-200 leading-relaxed">
-                Stop googling and start studying. BibleAI provides accurate scripture references and compassionate wisdom for life&apos;s toughest questions.
+              <p className="text-navy-300 text-lg leading-relaxed">
+                Ask deep theological questions or simple lookups. Get compassionate, accurate answers grounded in biblical truth.
               </p>
               <div className="grid grid-cols-2 gap-6">
                 {[
-                  { label: 'Scripture-First', desc: 'Every answer is backed by verses' },
-                  { label: 'Context Aware', desc: 'Understands theological nuance' },
-                  { label: 'Safe Space', desc: 'Your data is private & encrypted' },
-                  { label: 'Daily Habits', desc: 'Built-in tracking for consistency' }
+                  { label: 'Scripture-Based', desc: 'Every answer uses real verses' },
+                  { label: 'Fast & Direct', desc: 'Get answers in seconds' },
+                  { label: 'Private', desc: 'Your data is always secure' },
+                  { label: 'Daily Tracking', desc: 'Build a habit that sticks' }
                 ].map((item, i) => (
                   <div key={i} className="space-y-1">
                     <div className="flex items-center gap-2">
@@ -335,8 +339,9 @@ export default function Landing() {
                         </div>
                       </div>
                       <div className="flex justify-start animate-slide-up-fade [animation-delay:1.5s]">
-                         <div className="bg-navy-800 border border-gold-400/20 text-navy-100 text-sm px-6 py-5 rounded-3xl rounded-tl-none max-w-[90%] leading-relaxed shadow-xl">
-                            "Isaiah 41:10 says, 'So do not fear, for I am with you; do not be dismayed, for I am your God. I will strengthen you and help you; I will uphold you with my righteous right hand.' Remember that He is your source of peace."
+                         <div className="bg-navy-800 border border-gold-400/20 text-navy-100 text-sm px-6 py-5 rounded-3xl rounded-tl-none max-w-[90%] leading-relaxed shadow-xl relative group/msg">
+                            <div className="absolute inset-0 bg-gold-400/5 blur-xl opacity-0 group-hover/msg:opacity-100 transition-opacity" />
+                            <p className="relative">"Isaiah 41:10 says, 'So do not fear, for I am with you; do not be dismayed, for I am your God. I will strengthen you and help you; I will uphold you with my righteous right hand.' Remember that He is your source of peace."</p>
                          </div>
                       </div>
                       <div className="flex justify-end animate-slide-up-fade [animation-delay:2.5s]">

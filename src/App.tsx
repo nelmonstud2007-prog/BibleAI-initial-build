@@ -18,6 +18,7 @@ import Settings from './pages/dashboard/Settings';
 import PrayerAnalytics from './pages/dashboard/PrayerAnalytics';
 import Bible from './pages/dashboard/Bible';
 import SeoMeta from './components/SeoMeta';
+import ErrorBoundary from './components/ErrorBoundary';
 
 /**
  * Route layout:
@@ -73,7 +74,9 @@ export default function App() {
             path="/dashboard"
             element={
               <ProtectedRoute>
-                <DashboardLayout />
+                <ErrorBoundary>
+                  <DashboardLayout />
+                </ErrorBoundary>
               </ProtectedRoute>
             }
           >

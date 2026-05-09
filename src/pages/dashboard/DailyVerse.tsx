@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import {
@@ -31,9 +31,15 @@ export default function DailyVerse() {
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
 
+  const hasFetched = useRef<string | null>(null);
+
   useEffect(() => {
-    if (user) fetchDevotional();
-  }, [user]);
+    const today = new Date().toISOString().split('T')[0];
+    if (user?.id && hasFetched.current !== `${user.id}-${today}`) {
+      hasFetched.current = `${user.id}-${today}`;
+      fetchDevotional();
+    }
+  }, [user?.id]);
 
   const fetchDevotional = async () => {
     if (!user) return;

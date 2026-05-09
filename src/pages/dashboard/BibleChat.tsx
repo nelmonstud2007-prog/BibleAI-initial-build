@@ -117,36 +117,6 @@ const formatMessageContent = (content: string, onVerseClick?: (ref: string) => v
   return result;
 };
 
-const TypewriterMessage = ({
-  content,
-  onVerseClick,
-  onComplete,
-}: {
-  content: string;
-  onVerseClick?: (ref: string) => void;
-  onComplete?: () => void;
-}) => {
-  const words = useMemo(() => content.split(' '), [content]);
-  const [index, setIndex] = useState(0);
-
-  useEffect(() => {
-    if (index < words.length) {
-      const timer = setTimeout(() => setIndex((p) => p + 1), 25);
-      return () => clearTimeout(timer);
-    } else if (onComplete) {
-      onComplete();
-    }
-  }, [index, words, onComplete]);
-
-  return (
-    <div className="whitespace-pre-wrap break-words leading-relaxed">
-      {formatMessageContent(words.slice(0, index).join(' '), onVerseClick)}
-      {index < words.length && (
-        <span className="inline-block w-1.5 h-4 bg-gold-400/50 ml-1 animate-pulse align-middle rounded-full" />
-      )}
-    </div>
-  );
-};
 
 // ─── Main component ──────────────────────────────────────────────────────────
 
@@ -304,8 +274,11 @@ export default function BibleChat() {
       return;
     }
 
-    const userMessage: Message = { id: `temp-${Date.now()}`, role: 'user', content: text };
-    setMessages([...messages, userMessage]);
+    const userMessage: Message = { id: `user-${Date.now()}`, role: 'user', content: text };
+    const assistantMessageId = `resp-${Date.now()}`;
+    const initialAssistantMessage: Message = { id: assistantMessageId, role: 'assistant', content: '' };
+    
+    setMessages((prev) => [...prev, userMessage, initialAssistantMessage]);
     setInput('');
     setIsTyping(true);
 
@@ -319,34 +292,76 @@ export default function BibleChat() {
 
       trackEvent('chat_message_sent', { conversation_id: conversationId, persona: activePersona });
 
-      const { data, error } = await supabase.functions.invoke('bible-chat', {
-        body: {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/bible-chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`,
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({
           messages: [...messages, userMessage].map((m) => ({ role: m.role, content: m.content })),
           conversation_id: conversationId,
-          persona: activePersona // Edge function needs to handle this
-        },
+          persona: activePersona
+        }),
       });
 
-      if (error && error.context?.status === 429) {
+      if (response.status === 429) {
         setUsage((prev) => ({ ...prev, used: prev.limit ?? 5 }));
         setShowUpgradeModal(true);
         startCooldown(COOLDOWN_SECONDS);
+        setIsTyping(false);
         return;
       }
 
-      if (error) throw error;
+      if (!response.ok) throw new Error('AI failed');
 
-      const assistantMessage: Message = { id: `resp-${Date.now()}`, role: 'assistant', content: data.content };
-      setMessages((prev) => [...prev, assistantMessage]);
-      if (data.usage) setUsage(data.usage);
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let fullContent = '';
 
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value);
+          const lines = chunk.split('\n');
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const data = line.slice(6);
+              if (data === '[DONE]') continue;
+
+              try {
+                const parsed = JSON.parse(data);
+                if (parsed.delta) {
+                  fullContent += parsed.delta;
+                  setMessages((prev) => 
+                    prev.map((m) => m.id === assistantMessageId ? { ...m, content: fullContent } : m)
+                  );
+                }
+              } catch (e) {
+                // Partial chunk
+              }
+            }
+          }
+        }
+      }
+
+      // Update conversation title if first message
       if (messages.length === 0 && conversationId) {
         const title = text.length > 40 ? text.slice(0, 40) + '...' : text;
         await supabase.from('chat_conversations').update({ title }).eq('id', conversationId);
         setConversations((prev) => prev.map((c) => (c.id === conversationId ? { ...c, title } : c)));
       }
+      
+      fetchUsage(); // Refresh usage after message completion
     } catch (error) {
-      setMessages((prev) => [...prev, { id: `err-${Date.now()}`, role: 'assistant', content: 'I apologize, but I encountered an error. Please try again.' }]);
+      console.error('Streaming error:', error);
+      setMessages((prev) => prev.map((m) => m.id === assistantMessageId ? { ...m, content: 'I apologize, but I encountered an error. Please try again.' } : m));
     } finally {
       setIsTyping(false);
     }
@@ -532,11 +547,7 @@ export default function BibleChat() {
                      </div>
                      <div className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'} max-w-[85%] sm:max-w-[75%]`}>
                         <div className={`p-6 rounded-[2.5rem] text-[15px] leading-relaxed shadow-2xl transition-all ${m.role === 'user' ? 'bg-navy-800 border border-navy-700 text-white rounded-tr-none' : 'bg-navy-900/60 backdrop-blur-md border border-white/5 text-navy-100 rounded-tl-none'}`}>
-                           {m.role === 'assistant' && i === messages.length - 1 && !isTyping ? (
-                             <TypewriterMessage content={m.content} onVerseClick={handleVerseClick} onComplete={scrollToBottom} />
-                           ) : (
-                             <div className="whitespace-pre-wrap">{m.role === 'assistant' ? formatMessageContent(m.content, handleVerseClick) : m.content}</div>
-                           )}
+                           <div className="whitespace-pre-wrap">{m.role === 'assistant' ? formatMessageContent(m.content, handleVerseClick) : m.content}</div>
                         </div>
                         <div className="flex items-center gap-2 mt-3 px-4">
                            <span className="text-[9px] font-black text-navy-600 uppercase tracking-widest">{m.role === 'user' ? 'Disciple' : currentPersona.name}</span>

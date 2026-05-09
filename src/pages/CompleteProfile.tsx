@@ -66,9 +66,9 @@ export default function CompleteProfile() {
 
   if (loading || profileLoading) {
     return (
-      <div className="min-h-screen bg-navy-950 flex flex-col items-center justify-center gap-6">
+      <div className="min-h-screen bg-[#020617] flex flex-col items-center justify-center gap-6">
         <Loader2 className="w-12 h-12 text-gold-400 animate-spin" />
-        <p className="text-[10px] font-black text-navy-500 uppercase tracking-[0.3em] animate-pulse">Initializing Sacred Space</p>
+        <p className="text-[10px] font-black text-navy-500 uppercase tracking-[0.3em] animate-pulse">Preparing your experience...</p>
       </div>
     );
   }
@@ -86,56 +86,49 @@ export default function CompleteProfile() {
         {/* Glow behind card */}
         <div className="absolute -inset-1 bg-gold-gradient rounded-[2.5rem] blur-2xl opacity-10 group-hover:opacity-20 transition-all duration-700" />
         
-        <div className="relative bg-navy-900 border border-white/5 rounded-[2.5rem] p-8 sm:p-12 shadow-2xl space-y-10">
+        <div className="bg-white/[0.03] backdrop-blur-2xl border border-white/10 rounded-[2.5rem] p-8 sm:p-12 shadow-[0_32px_64px_-12px_rgba(0,0,0,0.8)] space-y-10">
           <div className="text-center space-y-4">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-gold-gradient rounded-2xl shadow-xl shadow-gold-400/20 mb-4 transform hover:rotate-3 transition-transform">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-gold-gradient rounded-2xl shadow-xl shadow-gold-400/20 mb-2 transform hover:rotate-3 transition-transform">
               <Cross className="w-8 h-8 text-navy-950" />
             </div>
             <div className="space-y-1">
-              <h1 className="text-3xl font-black text-white tracking-tight">Final Step</h1>
-              <p className="text-navy-300 text-sm font-medium">Customize your BibleAI experience before we begin.</p>
+              <h1 className="text-3xl font-bold text-white tracking-tight">Final Step</h1>
+              <p className="text-navy-400 text-sm font-medium">Customize your experience before we begin.</p>
             </div>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-8">
             {error && (
-              <div className="bg-red-400/10 border border-red-400/20 rounded-2xl px-5 py-3.5 text-sm text-red-400 font-bold flex items-center gap-2">
-                <span className="w-1.5 h-1.5 bg-red-400 rounded-full animate-pulse" />
+              <div className="bg-red-500/10 border border-red-500/20 rounded-2xl px-5 py-4 text-xs text-red-400 font-bold flex items-center gap-2">
                 {error}
               </div>
             )}
 
             <div className="space-y-6">
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-navy-500 uppercase tracking-[0.2em] ml-2">Display Name</label>
-                <div className="relative">
+                <label className="text-[10px] font-black text-navy-500 uppercase tracking-widest ml-2">Full Name</label>
+                <div className="relative group">
                   <input
                     type="text"
                     value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
                     required
-                    className="w-full bg-navy-950/50 border border-white/5 rounded-2xl px-5 py-4 text-sm text-white placeholder:text-navy-700 focus:outline-none focus:border-gold-400/30 transition-all"
+                    className="w-full bg-white/[0.02] border border-white/5 rounded-2xl px-5 py-4 text-sm text-white placeholder:text-navy-700 focus:outline-none focus:border-gold-400/30 transition-all"
                     placeholder="Your Name"
                   />
-                  <div className="absolute right-5 top-1/2 -translate-y-1/2 text-navy-700 group-focus-within:text-gold-400/50 transition-colors">
-                     <Sparkles className="w-4 h-4" />
-                  </div>
                 </div>
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-navy-500 uppercase tracking-[0.2em] ml-2">Favourite Scripture (Optional)</label>
-                <div className="relative">
+                <label className="text-[10px] font-black text-navy-500 uppercase tracking-widest ml-2">Favourite Scripture (Optional)</label>
+                <div className="relative group">
                   <input
                     type="text"
                     value={favoriteVerse}
                     onChange={(e) => setFavoriteVerse(e.target.value)}
-                    className="w-full bg-navy-950/50 border border-white/5 rounded-2xl px-5 py-4 text-sm text-white placeholder:text-navy-700 focus:outline-none focus:border-gold-400/30 transition-all"
+                    className="w-full bg-white/[0.02] border border-white/5 rounded-2xl px-5 py-4 text-sm text-white placeholder:text-navy-700 focus:outline-none focus:border-gold-400/30 transition-all"
                     placeholder="e.g. John 3:16"
                   />
-                  <div className="absolute right-5 top-1/2 -translate-y-1/2 text-navy-700 group-focus-within:text-emerald-400/50 transition-colors">
-                     <Heart className="w-4 h-4" />
-                  </div>
                 </div>
               </div>
             </div>
@@ -143,21 +136,21 @@ export default function CompleteProfile() {
             <button
               type="submit"
               disabled={saving || !displayName.trim()}
-              className="group w-full bg-gold-gradient text-navy-950 font-black py-5 rounded-2xl shadow-xl shadow-gold-400/10 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-40"
+              className="group w-full bg-gold-gradient text-navy-950 font-black py-5 rounded-2xl shadow-2xl shadow-gold-400/10 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-40"
             >
               {saving ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
               ) : (
                 <span className="flex items-center gap-2">
-                   Enter Dashboard
+                   Get Started
                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                 </span>
               )}
             </button>
           </form>
 
-          <p className="text-center text-[10px] font-black text-navy-600 uppercase tracking-widest">
-            BibleAI &bull; Sacred Technology
+          <p className="text-center text-[10px] font-black text-navy-600 uppercase tracking-[0.3em]">
+            BibleAI &bull; Excellence in Tech
           </p>
         </div>
       </div>

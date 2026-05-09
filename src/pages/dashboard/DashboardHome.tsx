@@ -4,16 +4,16 @@ import { supabase } from '../../lib/supabase';
 import { MessageCircle, BookOpen, Sun, Flame, ChevronRight, Sparkles, Trophy, Calendar, ArrowRight, Quote } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { trackEvent } from '../../lib/analytics';
+import { useStreak } from '../../lib/useStreak';
 
 export default function DashboardHome() {
   const { user } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const firstName = user?.user_metadata?.full_name?.split(' ')[0] || 'there';
+  const { streak: streakDays, prayedToday, loading: streakLoading } = useStreak(user?.id);
   const [prayerCount, setPrayerCount] = useState(0);
-  const [streakDays, setStreakDays] = useState(0);
   const [loadingData, setLoadingData] = useState(true);
-  const [prayedToday, setPrayedToday] = useState(false);
   const [verseOfTheDay, setVerseOfTheDay] = useState<{ text: string; ref: string } | null>(null);
 
   useEffect(() => {
@@ -21,30 +21,16 @@ export default function DashboardHome() {
     void fetchDashboardData();
   }, [user?.id]);
 
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    if (params.get('upgraded') === 'true') {
-      trackEvent('subscription_purchase_completed');
-      navigate(location.pathname, { replace: true });
-    }
-  }, [location.pathname, location.search, navigate]);
-
   const fetchDashboardData = async () => {
     if (!user) return;
     setLoadingData(true);
     const today = new Date().toISOString().split('T')[0];
     try {
-      const [prayersRes, streaksRes, devotionalRes] = await Promise.all([
+      const [prayersRes, devotionalRes] = await Promise.all([
         supabase
           .from('prayer_journal_entries')
           .select('id', { count: 'exact', head: true })
           .eq('user_id', user.id),
-        supabase
-          .from('prayer_streaks')
-          .select('date')
-          .eq('user_id', user.id)
-          .order('date', { ascending: false })
-          .limit(365),
         supabase
           .from('daily_devotionals')
           .select('verse, verse_ref')
@@ -53,69 +39,15 @@ export default function DashboardHome() {
       ]);
 
       if (prayersRes.error) throw prayersRes.error;
-      if (streaksRes.error) throw streaksRes.error;
 
       if (devotionalRes.data) {
         setVerseOfTheDay({ text: devotionalRes.data.verse, ref: devotionalRes.data.verse_ref });
       }
 
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('last_prayer_added_date')
-        .eq('id', user.id)
-        .maybeSingle();
-
-      if (profile?.last_prayer_added_date === today) {
-        setPrayedToday(true);
-      } else {
-        setPrayedToday(false);
-      }
-
-      const streaks = streaksRes.data;
       setPrayerCount(prayersRes.count ?? 0);
-
-      if (!streaks || streaks.length === 0 || streaks[0].date !== today) {
-        // Check if the streak was active yesterday
-        const yesterday = new Date();
-        yesterday.setDate(yesterday.getDate() - 1);
-        const yesterdayStr = yesterday.toISOString().split('T')[0];
-        
-        if (streaks && streaks[0]?.date === yesterdayStr) {
-           // Streak is still "active" but today hasn't been completed yet
-           // I'll keep the streak count but show a "don't forget" message
-        } else {
-          setStreakDays(0);
-          return;
-        }
-      }
-
-      let currentStreak = streaks?.[0]?.date === today ? 1 : 0;
-      const dates = streaks?.map((s) => s.date) || [];
-      
-      // Calculate streak logic...
-      let streak = 0;
-      if (dates.length > 0) {
-        let checkDate = new Date();
-        // If they haven't prayed today, start checking from yesterday
-        if (dates[0] !== today) {
-          checkDate.setDate(checkDate.getDate() - 1);
-        }
-        
-        for (let i = 0; i < dates.length; i++) {
-          const dStr = checkDate.toISOString().split('T')[0];
-          if (dates.includes(dStr)) {
-            streak++;
-            checkDate.setDate(checkDate.getDate() - 1);
-          } else {
-            break;
-          }
-        }
-      }
-      setStreakDays(streak);
     } catch (err) {
       console.error('Failed to fetch dashboard data:', err);
       setPrayerCount(0);
-      setStreakDays(0);
     } finally {
       setLoadingData(false);
     }
@@ -146,7 +78,7 @@ export default function DashboardHome() {
           <h1 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">
             Hello, <span className="text-gold-gradient bg-clip-text text-transparent">{firstName}</span>
           </h1>
-          <p className="text-navy-300 text-lg">Welcome back. How can we grow in faith today?</p>
+          <p className="text-navy-300 text-lg">Welcome back. How can we help today?</p>
         </div>
         {prayedToday ? (
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl text-sm font-bold text-emerald-400 shadow-xl shadow-emerald-500/5 animate-glow-pulse">

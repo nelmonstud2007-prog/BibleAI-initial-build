@@ -18,7 +18,7 @@ interface Message {
   content: string;
 }
 
-const formatMessageContent = (content: string) => {
+const formatMessageContent = (content: string, onVerseClick?: (ref: string) => void) => {
   const verseRegex = /([1-3]\s+)?[A-Z][a-z]+\s+\d+:\d+(-\d+)?/g;
   const result: (string | JSX.Element)[] = [];
   let lastIndex = 0;
@@ -26,39 +26,58 @@ const formatMessageContent = (content: string) => {
 
   while ((match = verseRegex.exec(content)) !== null) {
     result.push(content.substring(lastIndex, match.index));
-    result.push(
-      <span
-        key={match.index}
-        className="inline-block px-2 py-0.5 rounded-md bg-gold-400/10 text-gold-400 font-medium border border-gold-400/20 mx-1 text-[11px] align-middle shadow-sm"
-      >
-        {match[0]}
-      </span>
-    );
+    const ref = match[0];
+    
+    if (onVerseClick) {
+      result.push(
+        <button
+          key={match.index}
+          onClick={() => onVerseClick(ref)}
+          className="inline-block px-2 py-0.5 rounded-md bg-gold-400/10 text-gold-400 font-medium border border-gold-400/20 mx-1 text-[11px] align-middle shadow-sm hover:bg-gold-400/20 transition-colors"
+        >
+          {ref}
+        </button>
+      );
+    } else {
+      result.push(
+        <span
+          key={match.index}
+          className="inline-block px-2 py-0.5 rounded-md bg-gold-400/10 text-gold-400 font-medium border border-gold-400/20 mx-1 text-[11px] align-middle shadow-sm"
+        >
+          {ref}
+        </span>
+      );
+    }
     lastIndex = verseRegex.lastIndex;
   }
   result.push(content.substring(lastIndex));
   return result;
 };
 
-const TypewriterMessage = ({ content, onComplete }: { content: string; onComplete?: () => void }) => {
-  const words = useMemo(() => content.split(' '), [content]);
+const TypewriterMessage = ({ content, onComplete, onVerseClick }: { content: string; onComplete?: () => void; onVerseClick?: (ref: string) => void }) => {
+  const [displayedText, setDisplayedText] = useState('');
   const [index, setIndex] = useState(0);
+  const CHUNK_SIZE = 8;
 
   useEffect(() => {
-    if (index < words.length) {
+    if (index < content.length) {
       const timer = setTimeout(() => {
-        setIndex((prev) => prev + 1);
-      }, 30);
+        const nextIndex = Math.min(index + CHUNK_SIZE, content.length);
+        setDisplayedText(content.substring(0, nextIndex));
+        setIndex(nextIndex);
+      }, 15);
       return () => clearTimeout(timer);
     } else if (onComplete) {
       onComplete();
     }
-  }, [index, words, onComplete]);
+  }, [index, content, onComplete]);
+
+  const isComplete = index >= content.length;
 
   return (
     <div className="whitespace-pre-wrap break-words">
-      {formatMessageContent(words.slice(0, index).join(' '))}
-      {index < words.length && (
+      {isComplete ? formatMessageContent(content, onVerseClick) : displayedText}
+      {!isComplete && (
         <span className="inline-block w-1.5 h-4 bg-gold-400/50 ml-1 animate-pulse align-middle" />
       )}
     </div>
@@ -72,6 +91,7 @@ interface BibleStudyPanelProps {
     reference: string;
     text: string;
   } | null;
+  onVerseClick?: (ref: string) => void;
 }
 
 export default function BibleStudyPanel({ isOpen, onClose, initialVerse }: BibleStudyPanelProps) {
@@ -259,10 +279,10 @@ export default function BibleStudyPanel({ isOpen, onClose, initialVerse }: Bible
                 m.role === 'assistant' ? 'bg-navy-900/90 text-navy-100 border border-navy-800' : 'bg-gold-gradient text-navy-950 font-medium border border-gold-500/20'
               }`}>
                 {m.role === 'assistant' && i === messages.length - 1 && isTyping === false ? (
-                  <TypewriterMessage content={m.content} onComplete={scrollToBottom} />
+                  <TypewriterMessage content={m.content} onComplete={scrollToBottom} onVerseClick={onVerseClick} />
                 ) : (
                   <div className="whitespace-pre-wrap break-words">
-                    {m.role === 'assistant' ? formatMessageContent(m.content) : m.content}
+                    {m.role === 'assistant' ? formatMessageContent(m.content, onVerseClick) : m.content}
                   </div>
                 )}
               </div>

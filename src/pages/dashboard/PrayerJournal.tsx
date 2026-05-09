@@ -17,7 +17,9 @@ import {
   Zap,
   Target,
   ArrowRight,
-  Filter
+  Filter,
+  Edit2,
+  Search as SearchIcon,
 } from 'lucide-react';
 import UpgradeModal from '../../components/UpgradeModal';
 import { trackEvent } from '../../lib/analytics';
@@ -165,6 +167,15 @@ export default function PrayerJournal() {
   const [shareHeading, setShareHeading] = useState('');
   const [shareContent, setShareContent] = useState('');
   const [filter, setFilter] = useState<'all' | 'praying' | 'answered'>('all');
+  const [editingEntry, setEditingEntry] = useState<PrayerEntry | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+
+  // Debounce search
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchQuery), 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   useEffect(() => {
     if (user) {
@@ -265,35 +276,50 @@ export default function PrayerJournal() {
     setStreak(count);
   };
 
-  const addEntry = async () => {
+  const saveEntry = async () => {
     if (!user || !title.trim() || savingEntry) return;
 
-    if (!isPro && entries.length >= 10) {
+    if (!editingEntry && !isPro && entries.length >= 10) {
       setShowUpgrade(true);
       return;
     }
 
     setSavingEntry(true);
     try {
-      const { data, error } = await supabase
-        .from('prayer_journal_entries')
-        .insert({ user_id: user.id, title: title.trim(), content: content.trim(), category, status })
-        .select()
-        .single();
-      if (error) throw error;
-      if (data) {
-        setEntries([data as PrayerEntry, ...entries]);
-        trackEvent('prayer_added', { category, status });
-        setTitle('');
-        setContent('');
-        setCategory('Other');
-        setStatus('praying');
-        setShowForm(false);
-        await trackPrayerActivity('prayer');
-        fetchStreak();
+      if (editingEntry) {
+        const { data, error } = await supabase
+          .from('prayer_journal_entries')
+          .update({ title: title.trim(), content: content.trim(), category })
+          .eq('id', editingEntry.id)
+          .select()
+          .single();
+        if (error) throw error;
+        if (data) {
+          setEntries(entries.map(e => e.id === editingEntry.id ? (data as PrayerEntry) : e));
+          setEditingEntry(null);
+        }
+      } else {
+        const { data, error } = await supabase
+          .from('prayer_journal_entries')
+          .insert({ user_id: user.id, title: title.trim(), content: content.trim(), category, status })
+          .select()
+          .single();
+        if (error) throw error;
+        if (data) {
+          setEntries([data as PrayerEntry, ...entries]);
+          trackEvent('prayer_added', { category, status });
+          await trackPrayerActivity('prayer');
+          fetchStreak();
+        }
       }
+      
+      setTitle('');
+      setContent('');
+      setCategory('Other');
+      setStatus('praying');
+      setShowForm(false);
     } catch (err) {
-      console.error('Failed to add prayer entry:', err);
+      console.error('Failed to save prayer entry:', err);
     } finally {
       setSavingEntry(false);
     }
@@ -327,9 +353,32 @@ export default function PrayerJournal() {
     }
   };
 
+  const handleEdit = (entry: PrayerEntry) => {
+    setEditingEntry(entry);
+    setTitle(entry.title);
+    setContent(entry.content);
+    setCategory(entry.category);
+    setShowForm(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const highlightText = (text: string, query: string) => {
+    if (!query.trim()) return text;
+    const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+    const parts = text.split(regex);
+    return parts.map((part, i) => 
+      regex.test(part) ? (
+        <mark key={i} className="bg-gold-400/20 text-gold-300 rounded px-0.5">{part}</mark>
+      ) : part
+    );
+  };
+
   const filteredEntries = entries.filter(e => {
-    if (filter === 'all') return true;
-    return e.status === filter;
+    const matchesFilter = filter === 'all' || e.status === filter;
+    const matchesSearch = 
+      e.title.toLowerCase().includes(debouncedSearch.toLowerCase()) || 
+      e.content.toLowerCase().includes(debouncedSearch.toLowerCase());
+    return matchesFilter && matchesSearch;
   });
 
   const totalPrayers = entries.length;
@@ -406,22 +455,49 @@ export default function PrayerJournal() {
         {/* Main Section */}
         <div className="lg:col-span-8 space-y-8">
            
-           {/* Filters */}
-           <div className="flex items-center gap-3 bg-navy-900/40 border border-white/5 p-2 rounded-2xl w-fit">
-              {(['all', 'praying', 'answered'] as const).map((f) => (
-                <button
-                  key={f}
-                  onClick={() => setFilter(f)}
-                  className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
-                    filter === f 
-                      ? 'bg-gold-gradient text-navy-950 shadow-lg' 
-                      : 'text-navy-400 hover:text-white'
-                  }`}
-                >
-                  {f}
-                </button>
-              ))}
+           {/* Search & Filters */}
+           <div className="flex flex-col sm:flex-row items-center gap-6">
+              <div className="relative flex-1 w-full">
+                 <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-navy-600" />
+                 <input 
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search petitions..."
+                    className="w-full bg-navy-900/40 border border-white/5 rounded-2xl pl-12 pr-12 py-3 text-sm text-white focus:outline-none focus:border-gold-400/30 transition-all"
+                 />
+                 {searchQuery && (
+                   <button 
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 p-1 text-navy-600 hover:text-white transition-colors"
+                   >
+                      <X className="w-3.5 h-3.5" />
+                   </button>
+                 )}
+              </div>
+
+              <div className="flex items-center gap-2 bg-navy-900/40 border border-white/5 p-1.5 rounded-2xl w-fit">
+                 {(['all', 'praying', 'answered'] as const).map((f) => (
+                   <button
+                     key={f}
+                     onClick={() => setFilter(f)}
+                     className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                       filter === f 
+                         ? 'bg-gold-gradient text-navy-950 shadow-lg' 
+                         : 'text-navy-400 hover:text-white'
+                     }`}
+                   >
+                     {f}
+                   </button>
+                 ))}
+              </div>
            </div>
+
+           {debouncedSearch && (
+              <p className="text-[10px] font-black text-navy-500 uppercase tracking-widest ml-1">
+                 Found {filteredEntries.length} results for "{debouncedSearch}"
+              </p>
+           )}
 
            {/* Prayer List */}
            {loading ? (
@@ -463,7 +539,9 @@ export default function PrayerJournal() {
                                {catConfig.icon}
                             </div>
                             <div className="space-y-0.5">
-                               <h3 className="font-bold text-white group-hover:text-gold-400 transition-colors text-lg">{entry.title}</h3>
+                               <h3 className="font-bold text-white group-hover:text-gold-400 transition-colors text-lg">
+                                 {highlightText(entry.title, debouncedSearch)}
+                               </h3>
                                <p className="text-[10px] font-black text-navy-500 uppercase tracking-widest">{entry.category}</p>
                             </div>
                          </div>
@@ -474,13 +552,22 @@ export default function PrayerJournal() {
                          </div>
                       </div>
 
-                      <p className="text-navy-300 text-sm leading-relaxed mb-8 line-clamp-2 italic">"{entry.content || 'Seeking God\'s wisdom and intervention...'}"</p>
+                      <p className="text-navy-300 text-sm leading-relaxed mb-8 line-clamp-2 italic">
+                        "{entry.content ? highlightText(entry.content, debouncedSearch) : 'Seeking God\'s wisdom and intervention...'}"
+                      </p>
 
                       <div className="flex flex-wrap items-center justify-between gap-6 pt-6 border-t border-white/5">
                          <p className="text-[10px] font-bold text-navy-600 uppercase tracking-widest">
                            Logged {new Date(entry.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}
                          </p>
                          <div className="flex items-center gap-3">
+                            <button 
+                              onClick={() => handleEdit(entry)}
+                              className="p-3 bg-navy-950/50 text-navy-400 rounded-xl hover:bg-white/10 transition-colors border border-white/5"
+                              title="Edit Petition"
+                            >
+                               <Edit2 className="w-4 h-4" />
+                            </button>
                             <button 
                               onClick={() => talkToAI(entry)}
                               className="p-3 bg-navy-950/50 text-gold-400 rounded-xl hover:bg-gold-400/10 transition-colors border border-white/5"
@@ -519,8 +606,8 @@ export default function PrayerJournal() {
               <div className="bg-navy-900/40 border border-white/5 rounded-[2.5rem] p-8 space-y-8 relative overflow-hidden">
                  <div className="absolute top-0 left-0 w-full h-1 bg-gold-gradient" />
                  <div className="space-y-1">
-                    <h2 className="text-xl font-bold text-white">Add Petition</h2>
-                    <p className="text-[10px] font-black text-navy-500 uppercase tracking-widest">A dedicated space for your heart</p>
+                     <h2 className="text-xl font-bold text-white">{editingEntry ? 'Refine Petition' : 'Add Petition'}</h2>
+                     <p className="text-[10px] font-black text-navy-500 uppercase tracking-widest">{editingEntry ? 'Updating the legacy' : 'A dedicated space for your heart'}</p>
                  </div>
 
                  <div className="space-y-5">
@@ -561,12 +648,12 @@ export default function PrayerJournal() {
                     </div>
 
                     <button 
-                      onClick={addEntry}
+                      onClick={saveEntry}
                       disabled={!title.trim() || savingEntry}
                       className="w-full bg-gold-gradient text-navy-950 font-black py-4 rounded-2xl shadow-xl shadow-gold-400/10 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-40"
                     >
-                       {savingEntry ? <Loader2 className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}
-                       {savingEntry ? 'Saving to Journal...' : 'Seal with Amen'}
+                       {savingEntry ? <Loader2 className="w-5 h-5 animate-spin" /> : editingEntry ? <Edit2 className="w-5 h-5" /> : <Sparkles className="w-5 h-5" />}
+                       {savingEntry ? 'Saving to Journal...' : editingEntry ? 'Update Petition' : 'Seal with Amen'}
                     </button>
                  </div>
               </div>

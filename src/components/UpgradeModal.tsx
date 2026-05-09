@@ -128,15 +128,15 @@ export default function UpgradeModal({ open, onClose, limitType, limitDetail }: 
                 : 'border-navy-800 bg-navy-800/40 hover:border-navy-700'
             }`}
           >
-            <div className="absolute -top-3 right-4 bg-gold-gradient text-navy-950 text-[10px] font-bold px-3 py-1 rounded-full shadow-lg">
-              SAVE 33%
+            <div className="absolute -top-3 right-4 bg-gold-gradient text-navy-950 text-[10px] font-black px-4 py-1.5 rounded-full shadow-lg">
+              BEST VALUE &bull; SAVE 33%
             </div>
-            <p className={`text-xs font-bold uppercase tracking-widest mb-2 ${selectedPlan === 'yearly' ? 'text-gold-400' : 'text-navy-500'}`}>Yearly</p>
+            <p className={`text-xs font-black uppercase tracking-widest mb-2 ${selectedPlan === 'yearly' ? 'text-gold-400' : 'text-navy-500'}`}>Annual</p>
             <div className="flex items-baseline gap-1">
               <span className="text-2xl font-bold text-white">$39.99</span>
               <span className="text-xs text-navy-400">/yr</span>
             </div>
-            <p className="text-[10px] text-navy-500 mt-1">$3.33 per month</p>
+            <p className="text-[10px] font-bold text-navy-500 mt-1">$3.33 per month</p>
           </button>
         </div>
 
