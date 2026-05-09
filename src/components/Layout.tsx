@@ -11,6 +11,7 @@ import {
   LogOut,
   Cross,
   Crown,
+  Book,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import UpgradeModal from './UpgradeModal';
@@ -23,6 +24,7 @@ const navItems: Array<{
   proOnly?: boolean;
 }> = [
   { path: '/dashboard', label: 'Home', icon: Home },
+  { path: '/dashboard/bible', label: 'The Bible', icon: Book },
   { path: '/dashboard/bible-chat', label: 'Bible Chat', icon: MessageCircle },
   { path: '/dashboard/prayer-journal', label: 'Prayer Journal', icon: BookOpen },
   { path: '/dashboard/daily-verse', label: 'Daily Verse', icon: Sun },
@@ -79,12 +81,15 @@ export default function DashboardLayout() {
                           ? 'daily-verse-nav'
                           : undefined
                   }
-                  className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-150 ${
+                  className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-150 relative overflow-hidden ${
                     active
                       ? 'bg-gold-400/10 text-gold-400 border border-gold-400/20'
                       : 'text-navy-300 hover:text-white hover:bg-navy-800/50 border border-transparent'
                   }`}
                 >
+                  {active && (
+                    <div className="absolute left-0 top-2 bottom-2 w-1 bg-gold-400 rounded-r-full" />
+                  )}
                   <Icon className="w-5 h-5 flex-shrink-0" />
                   {item.label}
                 </Link>
@@ -116,9 +121,10 @@ export default function DashboardLayout() {
                 <p className="text-sm text-white truncate">{user?.email}</p>
                 <div className="flex items-center gap-1.5">
                   {isPro ? (
-                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-gold-400 bg-gold-400/10 px-1.5 py-0.5 rounded-md">
-                      <Crown className="w-3 h-3" />
-                      PRO
+                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-gold-400 bg-gold-400/10 px-1.5 py-0.5 rounded-md relative overflow-hidden group">
+                      <div className="absolute inset-0 animate-shimmer opacity-50" />
+                      <Crown className="w-3 h-3 relative z-10" />
+                      <span className="relative z-10">PRO</span>
                     </span>
                   ) : (
                     <p className="text-xs text-navy-400">Free Plan</p>
@@ -154,7 +160,7 @@ export default function DashboardLayout() {
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto pb-20 lg:pb-0">
+        <main className="flex-1 overflow-y-auto pb-20 lg:pb-0 animate-fade-in" key={location.pathname}>
           <Outlet />
         </main>
       </div>

@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import {
@@ -81,6 +82,7 @@ const TypewriterMessage = ({ content, onComplete }: { content: string; onComplet
 
 export default function BibleChat() {
   const { user } = useAuth();
+  const location = useLocation();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -91,12 +93,13 @@ export default function BibleChat() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [usage, setUsage] = useState<{ used: number; limit: number | null; tier: string }>({
     used: 0,
-    limit: 10,
+    limit: 5,
     tier: 'free',
   });
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const skipFetchRef = useRef(false);
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -111,11 +114,25 @@ export default function BibleChat() {
     if (!user) return;
     fetchConversations();
     fetchUsage();
-  }, [user]);
+
+    // Check for initial message from navigation state (e.g., from Bible page)
+    const state = location.state as { initialMessage?: string };
+    if (state?.initialMessage) {
+      setInput(state.initialMessage);
+      // We don't auto-send to allow user to edit, or we could auto-send.
+      // User requested "Ask AI" which usually implies sending.
+      // I'll set the input and let the user click send, or I could trigger handleSend.
+      // Given the "Ask AI" intent, I'll trigger it if input is set this way.
+    }
+  }, [user, location.state]);
 
   // Fetch messages when active conversation changes
   useEffect(() => {
     if (activeConversation) {
+      if (skipFetchRef.current) {
+        skipFetchRef.current = false;
+        return;
+      }
       fetchMessages(activeConversation.id);
     } else {
       setMessages([]);
@@ -181,7 +198,7 @@ export default function BibleChat() {
       if (usageError) {
         console.error('Failed to fetch chat usage:', usageError);
       }
-      setUsage({ used: usageData?.message_count || 0, limit: 10, tier });
+      setUsage({ used: usageData?.message_count || 0, limit: 5, tier });
     } else {
       setUsage({ used: 0, limit: null, tier });
     }
@@ -229,22 +246,14 @@ export default function BibleChat() {
       return;
     }
 
-    let conversationId = activeConversation?.id;
-
-    // Create conversation if none active
-    if (!conversationId) {
-      conversationId = await createConversation();
-      if (!conversationId) return;
-    }
-
-    // Add user message to UI immediately
+    // Add user message to UI immediately for instant feedback
     const userMessage: Message = {
       id: `temp-${Date.now()}`,
       role: 'user',
       content: text,
     };
-    setMessages((prev) => [...prev, userMessage]);
-    trackEvent('chat_message_sent', { conversation_id: conversationId ?? 'new' });
+    const currentMessages = [...messages, userMessage];
+    setMessages(currentMessages);
     setInput('');
     setIsTyping(true);
 
@@ -254,12 +263,23 @@ export default function BibleChat() {
     }
 
     try {
+      let conversationId = activeConversation?.id;
+
+      // Create conversation if none active
+      if (!conversationId) {
+        skipFetchRef.current = true;
+        conversationId = await createConversation();
+        if (!conversationId) {
+          setIsTyping(false);
+          return;
+        }
+      }
+
+      trackEvent('chat_message_sent', { conversation_id: conversationId });
+
       const { data, error } = await supabase.functions.invoke('bible-chat', {
         body: {
-          messages: [
-            ...messages.map((m) => ({ role: m.role, content: m.content })),
-            { role: 'user', content: text },
-          ],
+          messages: currentMessages.map((m) => ({ role: m.role, content: m.content })),
           conversation_id: conversationId,
         },
       });

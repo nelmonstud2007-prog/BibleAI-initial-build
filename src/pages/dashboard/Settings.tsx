@@ -169,7 +169,7 @@ export default function Settings() {
                   <p className="text-sm font-semibold text-white mb-3">Free</p>
                   <ul className="space-y-2">
                     {[
-                      '10 AI messages/day',
+                      '5 AI messages/day',
                       'Up to 10 prayers',
                       'Daily verse & devotional',
                     ].map((f) => (

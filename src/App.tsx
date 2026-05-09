@@ -15,6 +15,7 @@ import PrayerJournal from './pages/dashboard/PrayerJournal';
 import DailyVerse from './pages/dashboard/DailyVerse';
 import Settings from './pages/dashboard/Settings';
 import PrayerAnalytics from './pages/dashboard/PrayerAnalytics';
+import Bible from './pages/dashboard/Bible';
 import SeoMeta from './components/SeoMeta';
 
 export default function App() {
@@ -49,6 +50,7 @@ export default function App() {
             <Route path="bible-chat" element={<BibleChat />} />
             <Route path="prayer-journal" element={<PrayerJournal />} />
             <Route path="daily-verse" element={<DailyVerse />} />
+            <Route path="bible" element={<Bible />} />
             <Route path="analytics" element={<PrayerAnalytics />} />
             <Route path="settings" element={<Settings />} />
           </Route>

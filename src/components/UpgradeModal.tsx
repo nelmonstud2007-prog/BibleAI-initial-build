@@ -67,7 +67,7 @@ export default function UpgradeModal({ open, onClose, limitType, limitDetail }: 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center px-4">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-navy-900 border border-navy-800 rounded-2xl p-6 sm:p-8 max-w-lg w-full shadow-2xl">
+      <div className="relative bg-navy-900 border border-navy-800 rounded-2xl p-6 sm:p-8 max-w-lg w-full shadow-2xl animate-scale-in">
         <button
           onClick={onClose}
           className="absolute top-4 right-4 text-navy-400 hover:text-white transition-colors"

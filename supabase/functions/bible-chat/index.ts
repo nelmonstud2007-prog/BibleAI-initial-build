@@ -10,7 +10,7 @@ const corsHeaders = {
 const SYSTEM_PROMPT =
   "You are a knowledgeable and compassionate Bible scholar. Answer all questions using scripture references. Always cite specific Bible verses (book, chapter, verse). Be warm, encouraging, and faith-centered.";
 
-const FREE_DAILY_LIMIT = 10;
+const FREE_DAILY_LIMIT = 5;
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {

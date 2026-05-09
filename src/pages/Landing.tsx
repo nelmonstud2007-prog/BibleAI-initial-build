@@ -8,8 +8,12 @@ import {
   ChevronDown,
   Quote,
   Check,
+  X,
+  Send,
+  Bot,
+  Sparkles,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 const features = [
   {
@@ -56,7 +60,7 @@ const testimonials = [
 const faqs = [
   {
     question: 'Is BibleAI free to use?',
-    answer: 'Yes! BibleAI offers a generous free plan that includes 10 AI chat messages per day, up to 10 prayer journal entries, and daily devotionals. For unlimited access, you can upgrade to Pro for just $4.99/month.',
+    answer: 'Yes! BibleAI offers a generous free plan that includes 5 AI chat messages per day, up to 10 prayer journal entries, and daily devotionals. For unlimited access, you can upgrade to Pro for just $4.99/month.',
   },
   {
     question: 'What Bible translation does the AI use?',
@@ -104,7 +108,106 @@ function FAQItem({ question, answer }: { question: string; answer: string }) {
   );
 }
 
+function DemoChat({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [step, setStep] = useState(0);
+  const [messages, setMessages] = useState<Array<{ role: 'user' | 'bot'; text: string }>>([]);
+  const [isTyping, setIsTyping] = useState(false);
+
+  const demoScript = [
+    { role: 'user', text: "What does the Bible say about finding peace in hard times?" },
+    { role: 'bot', text: "Philippians 4:6-7 says: 'Do not be anxious about anything, but in every situation, by prayer and petition, with thanksgiving, present your requests to God. And the peace of God, which transcends all understanding, will guard your hearts and your minds in Christ Jesus.'" },
+    { role: 'user', text: "That's encouraging. Thank you!" },
+    { role: 'bot', text: "You're welcome! Remember that God is always with you. 'The Lord is close to the brokenhearted and saves those who are crushed in spirit.' (Psalm 34:18)" }
+  ];
+
+  useEffect(() => {
+    if (!open) {
+      setStep(0);
+      setMessages([]);
+      return;
+    }
+
+    if (step < demoScript.length) {
+      const timer = setTimeout(() => {
+        if (demoScript[step].role === 'user') {
+          setMessages(prev => [...prev, demoScript[step]]);
+          setStep(s => s + 1);
+        } else {
+          setIsTyping(true);
+          setTimeout(() => {
+            setMessages(prev => [...prev, demoScript[step]]);
+            setIsTyping(false);
+            setStep(s => s + 1);
+          }, 1500);
+        }
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [open, step]);
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed bottom-24 right-6 z-[60] w-full max-w-[350px] animate-scale-in">
+      <div className="bg-navy-900 border border-gold-400/30 rounded-2xl shadow-2xl overflow-hidden flex flex-col h-[450px]">
+        {/* Header */}
+        <div className="bg-navy-800 p-4 border-b border-navy-700 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-gold-400 rounded-lg flex items-center justify-center">
+              <Cross className="w-4 h-4 text-navy-950" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-white">BibleAI Demo</p>
+              <p className="text-[10px] text-emerald-400">Online & Ready</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-navy-400 hover:text-white transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-navy-950/50">
+          {messages.map((m, i) => (
+            <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in`}>
+              <div className={`max-w-[85%] p-3 rounded-2xl text-xs leading-relaxed ${
+                m.role === 'user' 
+                  ? 'bg-gold-400 text-navy-950 rounded-tr-none' 
+                  : 'bg-navy-800 text-navy-100 border border-navy-700 rounded-tl-none'
+              }`}>
+                {m.text}
+              </div>
+            </div>
+          ))}
+          {isTyping && (
+            <div className="flex justify-start animate-fade-in">
+              <div className="bg-navy-800 border border-navy-700 p-3 rounded-2xl rounded-tl-none">
+                <div className="flex gap-1">
+                  <div className="w-1 h-1 bg-gold-400 rounded-full animate-bounce" />
+                  <div className="w-1 h-1 bg-gold-400 rounded-full animate-bounce [animation-delay:0.2s]" />
+                  <div className="w-1 h-1 bg-gold-400 rounded-full animate-bounce [animation-delay:0.4s]" />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="p-4 border-t border-navy-800 bg-navy-900">
+          <Link 
+            to="/signup"
+            className="w-full bg-gold-400 text-navy-950 font-bold py-2 rounded-xl text-center text-sm hover:bg-gold-300 transition-colors block"
+          >
+            Start Your Own Chat
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Landing() {
+  const [demoOpen, setDemoOpen] = useState(false);
   return (
     <div className="min-h-screen bg-navy-950">
       {/* Navigation */}
@@ -315,6 +418,20 @@ export default function Landing() {
           </div>
         </div>
       </footer>
+
+      {/* Floating Demo Button */}
+      {!demoOpen && (
+        <button
+          onClick={() => setDemoOpen(true)}
+          className="fixed bottom-6 right-6 z-50 bg-gold-400 text-navy-950 font-bold px-6 py-3 rounded-full shadow-2xl hover:bg-gold-300 transition-all hover:-translate-y-1 flex items-center gap-2 group"
+        >
+          <MessageCircle className="w-5 h-5 group-hover:scale-110 transition-transform" />
+          Try Bible AI
+          <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse" />
+        </button>
+      )}
+
+      <DemoChat open={demoOpen} onClose={() => setDemoOpen(false)} />
     </div>
   );
 }

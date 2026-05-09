@@ -8,7 +8,7 @@ const corsHeaders = {
 };
 
 const FREE_LIMITS = {
-  ai_messages_per_day: 10,
+  ai_messages_per_day: 5,
   max_prayers: 10,
 };
 
