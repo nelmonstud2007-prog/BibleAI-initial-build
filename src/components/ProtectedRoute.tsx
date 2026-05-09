@@ -3,13 +3,24 @@ import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 
+interface ProtectedRouteProps {
+  children: React.ReactNode;
+  /**
+   * When true (default), the user must have completed their profile.
+   * Set false for the /complete-profile route itself.
+   */
+  requireProfileComplete?: boolean;
+}
+
+/**
+ * ProtectedRoute guards dashboard-level routes.
+ * It does NOT globally redirect logged-in users away from public pages
+ * (/, /landing, /pricing, etc.) — those routes never use this component.
+ */
 export default function ProtectedRoute({
   children,
   requireProfileComplete = true,
-}: {
-  children: React.ReactNode;
-  requireProfileComplete?: boolean;
-}) {
+}: ProtectedRouteProps) {
   const { user, loading } = useAuth();
   const [profileLoading, setProfileLoading] = useState(requireProfileComplete);
   const [profileCompleted, setProfileCompleted] = useState(false);
@@ -42,10 +53,12 @@ export default function ProtectedRoute({
     );
   }
 
+  // Not logged in → send to sign-in
   if (!user) {
     return <Navigate to="/signin" replace />;
   }
 
+  // Logged in but profile incomplete → complete-profile wizard
   if (requireProfileComplete && !profileCompleted) {
     return <Navigate to="/complete-profile" replace />;
   }

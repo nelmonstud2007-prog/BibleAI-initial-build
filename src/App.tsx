@@ -9,6 +9,7 @@ import CompleteProfile from './pages/CompleteProfile';
 import EmailConfirmed from './pages/EmailConfirmed';
 import Privacy from './pages/Privacy';
 import Terms from './pages/Terms';
+import UpgradeSuccess from './pages/UpgradeSuccess';
 import DashboardHome from './pages/dashboard/DashboardHome';
 import BibleChat from './pages/dashboard/BibleChat';
 import PrayerJournal from './pages/dashboard/PrayerJournal';
@@ -18,16 +19,46 @@ import PrayerAnalytics from './pages/dashboard/PrayerAnalytics';
 import Bible from './pages/dashboard/Bible';
 import SeoMeta from './components/SeoMeta';
 
+/**
+ * Route layout:
+ *
+ * Public (accessible logged-in OR logged-out):
+ *   /          → Landing
+ *   /pricing   → Landing (or a dedicated Pricing page if you create one)
+ *   /signin    → SignIn
+ *   /signup    → SignUp
+ *   /privacy   → Privacy
+ *   /terms     → Terms
+ *   /upgrade-success → UpgradeSuccess (must be accessible post-checkout redirect)
+ *
+ * Semi-protected (must be logged in, profile completion NOT required):
+ *   /email-confirmed   → EmailConfirmed
+ *   /complete-profile  → CompleteProfile
+ *
+ * Protected (must be logged in + profile complete):
+ *   /dashboard/*
+ */
 export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
         <SeoMeta />
         <Routes>
+          {/* ── Public routes (no forced redirect for logged-in users) ── */}
           <Route path="/" element={<Landing />} />
+          <Route path="/landing" element={<Landing />} />
+          {/* If you have a dedicated Pricing page, replace Landing below */}
+          <Route path="/pricing" element={<Landing />} />
           <Route path="/signin" element={<SignIn />} />
           <Route path="/signup" element={<SignUp />} />
           <Route path="/email-confirmed" element={<EmailConfirmed />} />
+          <Route path="/privacy" element={<Privacy />} />
+          <Route path="/terms" element={<Terms />} />
+
+          {/* ── Upgrade success (public URL, Stripe redirects here) ── */}
+          <Route path="/upgrade-success" element={<UpgradeSuccess />} />
+
+          {/* ── Semi-protected (logged in, profile completion not enforced) ── */}
           <Route
             path="/complete-profile"
             element={
@@ -36,8 +67,8 @@ export default function App() {
               </ProtectedRoute>
             }
           />
-          <Route path="/privacy" element={<Privacy />} />
-          <Route path="/terms" element={<Terms />} />
+
+          {/* ── Protected dashboard ── */}
           <Route
             path="/dashboard"
             element={

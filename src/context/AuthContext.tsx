@@ -4,6 +4,8 @@ import type { User, Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { getAppUrl } from '../lib/appUrl';
 
+export type SubscriptionTier = 'free' | 'pro_monthly' | 'pro_yearly';
+
 export interface UsageLimits {
   ai_messages: { used: number; limit: number | null; limit_reached: boolean };
   prayers: { used: number; limit: number | null; limit_reached: boolean };
@@ -13,11 +15,12 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  subscriptionTier: 'free' | 'pro';
+  subscriptionTier: SubscriptionTier;
   isPro: boolean;
   profileCompleted: boolean;
   limits: UsageLimits | null;
   refreshLimits: () => Promise<void>;
+  refreshProfile: () => Promise<void>;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: string | null }>;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
@@ -25,17 +28,27 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+/** Normalise whatever is stored in DB → our canonical SubscriptionTier */
+function normaliseTier(raw: string | null | undefined): SubscriptionTier {
+  if (raw === 'pro_monthly') return 'pro_monthly';
+  if (raw === 'pro_yearly') return 'pro_yearly';
+  // Legacy: the old code wrote "pro" without a period suffix
+  if (raw === 'pro') return 'pro_monthly';
+  return 'free';
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const [subscriptionTier, setSubscriptionTier] = useState<'free' | 'pro'>('free');
+  const [subscriptionTier, setSubscriptionTier] = useState<SubscriptionTier>('free');
   const [profileCompleted, setProfileCompleted] = useState(false);
   const [limits, setLimits] = useState<UsageLimits | null>(null);
 
-  const isPro = subscriptionTier === 'pro';
+  // isPro is true for any paid tier
+  const isPro = subscriptionTier === 'pro_monthly' || subscriptionTier === 'pro_yearly';
 
-  const fetchProfile = useCallback(async (userId: string) => {
+  const fetchProfile = useCallback(async (userId: string): Promise<SubscriptionTier> => {
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -43,7 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .eq('id', userId)
         .maybeSingle();
       if (error) throw error;
-      const tier = data?.subscription_tier === 'pro' ? 'pro' : 'free';
+      const tier = normaliseTier(data?.subscription_tier);
       setSubscriptionTier(tier);
       setProfileCompleted(Boolean(data?.profile_completed));
       return tier;
@@ -51,9 +64,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error('Failed to fetch profile:', err);
       setSubscriptionTier('free');
       setProfileCompleted(false);
-      return 'free' as const;
+      return 'free';
     }
   }, []);
+
+  /** Exposed so pages like UpgradeSuccess can force-refresh after payment */
+  const refreshProfile = useCallback(async () => {
+    if (!user) return;
+    await fetchProfile(user.id);
+  }, [user, fetchProfile]);
 
   const refreshLimits = useCallback(async () => {
     if (!session?.access_token) return;
@@ -69,7 +88,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (response.ok) {
         const data = await response.json();
         setLimits(data);
-        setSubscriptionTier(data.tier === 'pro' ? 'pro' : 'free');
+        // check-limits also returns tier — keep in sync
+        if (data.tier) {
+          setSubscriptionTier(normaliseTier(data.tier));
+        }
       }
     } catch (err) {
       console.error('Failed to fetch limits:', err);
@@ -144,6 +166,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         profileCompleted,
         limits,
         refreshLimits,
+        refreshProfile,
         signUp,
         signIn,
         signOut,
