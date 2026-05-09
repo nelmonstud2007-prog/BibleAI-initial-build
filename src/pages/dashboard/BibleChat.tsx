@@ -15,7 +15,11 @@ import {
   Cross,
   ChevronRight,
   User,
-  Bot
+  Bot,
+  Scroll,
+  Heart,
+  Landmark,
+  ChevronDown
 } from 'lucide-react';
 import UpgradeModal from '../../components/UpgradeModal';
 import { trackEvent } from '../../lib/analytics';
@@ -35,17 +39,56 @@ interface Conversation {
   updated_at: string;
 }
 
+type PersonaType = 'scholar' | 'guide' | 'historian';
+
+interface Persona {
+  id: PersonaType;
+  name: string;
+  tagline: string;
+  icon: any;
+  color: string;
+  bg: string;
+  description: string;
+}
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-/** Cooldown duration in seconds after daily limit is exhausted (free tier). */
+const PERSONAS: Persona[] = [
+  { 
+    id: 'scholar', 
+    name: 'Biblical Scholar', 
+    tagline: 'Deep Doctrine & Cross-References', 
+    icon: Scroll, 
+    color: 'text-blue-400', 
+    bg: 'bg-blue-400/10',
+    description: 'Focuses on theological precision, Greek/Hebrew meanings, and scriptural harmony.'
+  },
+  { 
+    id: 'guide', 
+    name: 'Compassionate Guide', 
+    tagline: 'Comfort, Healing & Prayer', 
+    icon: Heart, 
+    color: 'text-emerald-400', 
+    bg: 'bg-emerald-400/10',
+    description: 'Focuses on emotional support, spiritual encouragement, and practical life application.'
+  },
+  { 
+    id: 'historian', 
+    name: 'Historical Analyst', 
+    tagline: 'Archeology & Ancient Context', 
+    icon: Landmark, 
+    color: 'text-amber-400', 
+    bg: 'bg-amber-400/10',
+    description: 'Focuses on cultural background, archeological findings, and the 1st-century world.'
+  }
+];
+
 const COOLDOWN_SECONDS = 120;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function formatCountdown(seconds: number): string {
-  const m = Math.floor(seconds / 60)
-    .toString()
-    .padStart(2, '0');
+  const m = Math.floor(seconds / 60).toString().padStart(2, '0');
   const s = (seconds % 60).toString().padStart(2, '0');
   return `${m}:${s}`;
 }
@@ -74,8 +117,6 @@ const formatMessageContent = (content: string, onVerseClick?: (ref: string) => v
   return result;
 };
 
-// ─── TypewriterMessage ────────────────────────────────────────────────────────
-
 const TypewriterMessage = ({
   content,
   onVerseClick,
@@ -90,7 +131,7 @@ const TypewriterMessage = ({
 
   useEffect(() => {
     if (index < words.length) {
-      const timer = setTimeout(() => setIndex((p) => p + 1), 30);
+      const timer = setTimeout(() => setIndex((p) => p + 1), 25);
       return () => clearTimeout(timer);
     } else if (onComplete) {
       onComplete();
@@ -114,7 +155,6 @@ export default function BibleChat() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Conversation / message state
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -123,26 +163,23 @@ export default function BibleChat() {
   const [loadingConversations, setLoadingConversations] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [activePersona, setActivePersona] = useState<PersonaType>('scholar');
+  const [showPersonaMenu, setShowPersonaMenu] = useState(false);
 
-  // Usage / limit state
   const [usage, setUsage] = useState<{ used: number; limit: number | null; tier: string }>({
     used: 0,
     limit: 5,
     tier: 'free',
   });
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
-
-  // ── Cooldown state ────────────────────────────────────────────────────────
   const [cooldownRemaining, setCooldownRemaining] = useState<number>(0);
   const [isCooldownActive, setIsCooldownActive] = useState(false);
   const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const skipFetchRef = useRef(false);
 
-  // Placeholder cycling
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
   const placeholders = [
     'Ask about scripture, theology, or prayer...',
@@ -152,21 +189,18 @@ export default function BibleChat() {
     'What are some verses about strength?',
     'How do I forgive someone?',
   ];
+
+  const currentPersona = PERSONAS.find(p => p.id === activePersona)!;
+
   useEffect(() => {
-    const interval = setInterval(
-      () => setPlaceholderIndex((p) => (p + 1) % placeholders.length),
-      4000,
-    );
+    const interval = setInterval(() => setPlaceholderIndex((p) => (p + 1) % placeholders.length), 4000);
     return () => clearInterval(interval);
   }, []);
-
-  // ── Cooldown helpers ──────────────────────────────────────────────────────
 
   const startCooldown = useCallback((seconds = COOLDOWN_SECONDS) => {
     if (cooldownRef.current) clearInterval(cooldownRef.current);
     setCooldownRemaining(seconds);
     setIsCooldownActive(true);
-
     cooldownRef.current = setInterval(() => {
       setCooldownRemaining((prev) => {
         if (prev <= 1) {
@@ -181,47 +215,11 @@ export default function BibleChat() {
   }, []);
 
   useEffect(() => {
-    return () => {
-      if (cooldownRef.current) clearInterval(cooldownRef.current);
-    };
-  }, []);
-
-  // ── Navigation helpers ────────────────────────────────────────────────────
-
-  const handleVerseClick = (reference: string) => {
-    const match = reference.match(/^((?:\d\s+)?[A-Z][a-z]+)\s+(\d+):(\d+)/);
-    if (match) {
-      navigate('/dashboard/bible', {
-        state: {
-          jumpTo: {
-            book: match[1],
-            chapter: parseInt(match[2]),
-            verse: parseInt(match[3]),
-          },
-        },
-      });
-    }
-  };
-
-  const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, []);
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages, isTyping, scrollToBottom]);
-
-  // ── Fetch on mount ────────────────────────────────────────────────────────
-
-  useEffect(() => {
     if (!user) return;
     fetchConversations();
     fetchUsage();
-
     const state = location.state as { initialMessage?: string };
-    if (state?.initialMessage) {
-      setInput(state.initialMessage);
-    }
+    if (state?.initialMessage) setInput(state.initialMessage);
   }, [user, location.state]);
 
   useEffect(() => {
@@ -234,8 +232,6 @@ export default function BibleChat() {
     }
   }, [activeConversation?.id]);
 
-  // ── Data fetching ─────────────────────────────────────────────────────────
-
   const fetchConversations = async () => {
     if (!user) return;
     const { data, error } = await supabase
@@ -243,12 +239,7 @@ export default function BibleChat() {
       .select('id, title, updated_at')
       .eq('user_id', user.id)
       .order('updated_at', { ascending: false });
-    if (error) {
-      console.error('Failed to fetch conversations:', error);
-      setConversations([]);
-    } else {
-      setConversations(data ?? []);
-    }
+    if (!error) setConversations(data ?? []);
     setLoadingConversations(false);
   };
 
@@ -259,12 +250,7 @@ export default function BibleChat() {
       .select('id, role, content, created_at')
       .eq('conversation_id', conversationId)
       .order('created_at', { ascending: true });
-    if (error) {
-      console.error('Failed to fetch messages:', error);
-      setMessages([]);
-    } else {
-      setMessages(data ?? []);
-    }
+    if (!error) setMessages(data ?? []);
     setLoadingMessages(false);
   };
 
@@ -275,29 +261,14 @@ export default function BibleChat() {
       return;
     }
     const today = new Date().toISOString().split('T')[0];
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('subscription_tier')
-      .eq('id', user.id)
+    const { data: usageData } = await supabase
+      .from('chat_usage')
+      .select('message_count')
+      .eq('user_id', user.id)
+      .eq('date', today)
       .maybeSingle();
-
-    const tier = profile?.subscription_tier || 'free';
-    const isPaidTier = tier === 'pro_monthly' || tier === 'pro_yearly' || tier === 'pro';
-
-    if (isPaidTier) {
-      setUsage({ used: 0, limit: null, tier });
-    } else {
-      const { data: usageData } = await supabase
-        .from('chat_usage')
-        .select('message_count')
-        .eq('user_id', user.id)
-        .eq('date', today)
-        .maybeSingle();
-      setUsage({ used: usageData?.message_count || 0, limit: 5, tier });
-    }
+    setUsage({ used: usageData?.message_count || 0, limit: 5, tier: 'free' });
   };
-
-  // ── Conversation management ───────────────────────────────────────────────
 
   const createConversation = async (): Promise<string | null> => {
     if (!user) return null;
@@ -306,28 +277,20 @@ export default function BibleChat() {
       .insert({ user_id: user.id, title: 'New Conversation' })
       .select('id, title, updated_at')
       .single();
-    if (error) {
-      console.error('Failed to create conversation:', error);
-      return null;
-    }
-    if (data) {
-      setConversations((prev) => [data, ...prev]);
-      setActiveConversation(data);
-      return data.id;
-    }
-    return null;
+    if (error) return null;
+    setConversations((prev) => [data, ...prev]);
+    setActiveConversation(data);
+    return data.id;
   };
 
   const deleteConversation = async (id: string) => {
     const { error } = await supabase.from('chat_conversations').delete().eq('id', id);
-    if (error) {
-      console.error('Failed to delete conversation:', error);
-      return;
-    }
-    setConversations((prev) => prev.filter((c) => c.id !== id));
-    if (activeConversation?.id === id) {
-      setActiveConversation(null);
-      setMessages([]);
+    if (!error) {
+      setConversations((prev) => prev.filter((c) => c.id !== id));
+      if (activeConversation?.id === id) {
+        setActiveConversation(null);
+        setMessages([]);
+      }
     }
   };
 
@@ -341,449 +304,285 @@ export default function BibleChat() {
       return;
     }
 
-    const userMessage: Message = {
-      id: `temp-${Date.now()}`,
-      role: 'user',
-      content: text,
-    };
-    const currentMessages = [...messages, userMessage];
-    setMessages(currentMessages);
+    const userMessage: Message = { id: `temp-${Date.now()}`, role: 'user', content: text };
+    setMessages([...messages, userMessage]);
     setInput('');
     setIsTyping(true);
-    if (inputRef.current) inputRef.current.style.height = 'auto';
 
     try {
       let conversationId = activeConversation?.id;
       if (!conversationId) {
         skipFetchRef.current = true;
         conversationId = await createConversation();
-        if (!conversationId) {
-          setIsTyping(false);
-          return;
-        }
+        if (!conversationId) { setIsTyping(false); return; }
       }
 
-      trackEvent('chat_message_sent', { conversation_id: conversationId });
+      trackEvent('chat_message_sent', { conversation_id: conversationId, persona: activePersona });
 
       const { data, error } = await supabase.functions.invoke('bible-chat', {
         body: {
-          messages: currentMessages.map((m) => ({ role: m.role, content: m.content })),
+          messages: [...messages, userMessage].map((m) => ({ role: m.role, content: m.content })),
           conversation_id: conversationId,
+          persona: activePersona // Edge function needs to handle this
         },
       });
 
       if (error && error.context?.status === 429) {
-        setIsTyping(false);
-        const errBody = error.context as { error?: string; rate_limited?: boolean } | null;
-        if (errBody?.rate_limited) {
-          const rateLimitMsg: Message = {
-            id: `err-${Date.now()}`,
-            role: 'assistant',
-            content: "I'm receiving too many requests right now. Please wait a moment and try again. 🙏",
-          };
-          setMessages((prev) => [...prev, rateLimitMsg]);
-        } else {
-          setUsage((prev) => ({ ...prev, used: prev.limit ?? 5 }));
-          setShowUpgradeModal(true);
-          startCooldown(COOLDOWN_SECONDS);
-        }
+        setUsage((prev) => ({ ...prev, used: prev.limit ?? 5 }));
+        setShowUpgradeModal(true);
+        startCooldown(COOLDOWN_SECONDS);
         return;
       }
 
-      if (error) {
-        const errData = error.context && typeof error.context === 'object' ? error.context : null;
-        throw new Error(
-          (errData as { error?: string } | null)?.error || error.message || 'Failed to get response',
-        );
-      }
+      if (error) throw error;
 
-      const assistantMessage: Message = {
-        id: `resp-${Date.now()}`,
-        role: 'assistant',
-        content: data.content,
-      };
+      const assistantMessage: Message = { id: `resp-${Date.now()}`, role: 'assistant', content: data.content };
       setMessages((prev) => [...prev, assistantMessage]);
-
-      if (data.usage) {
-        setUsage(data.usage);
-        if (data.usage.limit !== null && data.usage.used >= data.usage.limit && !isPro) {
-          startCooldown(COOLDOWN_SECONDS);
-        }
-      }
+      if (data.usage) setUsage(data.usage);
 
       if (messages.length === 0 && conversationId) {
         const title = text.length > 40 ? text.slice(0, 40) + '...' : text;
-        await supabase
-          .from('chat_conversations')
-          .update({ title })
-          .eq('id', conversationId);
-        setConversations((prev) =>
-          prev.map((c) => (c.id === conversationId ? { ...c, title } : c)),
-        );
-        if (activeConversation?.id === conversationId) {
-          setActiveConversation((prev) => (prev ? { ...prev, title } : prev));
-        }
+        await supabase.from('chat_conversations').update({ title }).eq('id', conversationId);
+        setConversations((prev) => prev.map((c) => (c.id === conversationId ? { ...c, title } : c)));
       }
     } catch (error) {
-      console.error('Chat error:', error);
-      const errorMessage: Message = {
-        id: `err-${Date.now()}`,
-        role: 'assistant',
-        content: 'I apologize, but I encountered an error. Please try again.',
-      };
-      setMessages((prev) => [...prev, errorMessage]);
+      setMessages((prev) => [...prev, { id: `err-${Date.now()}`, role: 'assistant', content: 'I apologize, but I encountered an error. Please try again.' }]);
     } finally {
       setIsTyping(false);
     }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
+  };
+
+  const handleVerseClick = (reference: string) => {
+    const match = reference.match(/^((?:\d\s+)?[A-Z][a-z]+)\s+(\d+):(\d+)/);
+    if (match) {
+      navigate('/dashboard/bible', { state: { jumpTo: { book: match[1], chapter: parseInt(match[2]), verse: parseInt(match[3]) } } });
     }
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setInput(e.target.value);
-    const textarea = e.target;
-    textarea.style.height = 'auto';
-    textarea.style.height = Math.min(textarea.scrollHeight, 160) + 'px';
-  };
+  const scrollToBottom = useCallback(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, []);
 
-  const startNewChat = () => {
-    setActiveConversation(null);
-    setMessages([]);
-    setSidebarOpen(false);
-    inputRef.current?.focus();
-  };
+  useEffect(() => { scrollToBottom(); }, [messages, isTyping, scrollToBottom]);
 
-  const selectConversation = (conv: Conversation) => {
-    setActiveConversation(conv);
-    setSidebarOpen(false);
-  };
-
-  const usagePercent =
-    usage.limit !== null ? Math.min((usage.used / usage.limit) * 100, 100) : 0;
-
-  const inputDisabled = isTyping || isCooldownActive;
+  const usagePercent = usage.limit !== null ? Math.min((usage.used / usage.limit) * 100, 100) : 0;
 
   return (
     <div className="flex h-screen overflow-hidden bg-navy-950">
-      {/* Mobile overlay */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black/70 backdrop-blur-sm z-40 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
+      <UpgradeModal open={showUpgradeModal} onClose={() => setShowUpgradeModal(false)} limitType="ai_messages" />
 
-      {/* ── Sidebar ───────────────────────────────────────────────────────── */}
-      <aside
-        className={`fixed lg:static inset-y-0 left-0 z-50 w-80 bg-navy-900 border-r border-navy-800/50 flex flex-col transform transition-transform duration-300 ease-in-out lg:transform-none ${
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
-        }`}
-      >
-        <div className="p-4 border-b border-navy-800/50">
-          <button
-            onClick={startNewChat}
-            className="w-full flex items-center justify-center gap-2 bg-gold-400 text-navy-950 font-bold px-4 py-3 rounded-2xl hover:bg-gold-300 transition-all shadow-lg shadow-gold-400/10 active:scale-95"
-          >
-            <Plus className="w-5 h-5" />
-            New Journey
-          </button>
+      {/* ── Sidebar ── */}
+      <aside className={`fixed lg:static inset-y-0 left-0 z-50 w-80 bg-navy-900 border-r border-white/5 flex flex-col transform transition-transform duration-300 lg:transform-none ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
+        <div className="p-6 border-b border-white/5">
+           <button onClick={() => { setActiveConversation(null); setMessages([]); setSidebarOpen(false); }} className="w-full bg-gold-gradient text-navy-950 font-black px-6 py-4 rounded-2xl shadow-xl shadow-gold-400/10 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3 uppercase tracking-widest text-xs">
+             <Plus className="w-5 h-5" />
+             New Journey
+           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-3 space-y-2">
+        <div className="flex-1 overflow-y-auto p-4 space-y-2 scrollbar-none">
           {loadingConversations ? (
-            <div className="flex flex-col items-center justify-center py-12 space-y-3">
-              <Loader2 className="w-6 h-6 animate-spin text-gold-400" />
-              <span className="text-xs text-navy-500 font-medium tracking-widest uppercase">Loading history</span>
+            <div className="flex flex-col items-center justify-center py-20 gap-3">
+               <Loader2 className="w-6 h-6 animate-spin text-gold-400" />
+               <p className="text-[10px] font-black text-navy-600 uppercase tracking-widest">Opening History</p>
             </div>
           ) : conversations.length === 0 ? (
-            <div className="text-center py-12 px-6">
-              <div className="w-12 h-12 bg-navy-800 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <MessageSquare className="w-6 h-6 text-navy-600" />
-              </div>
-              <p className="text-xs text-navy-400 leading-relaxed font-medium">Your spiritual conversations will appear here.</p>
+            <div className="text-center py-20 px-6 space-y-4">
+               <div className="w-16 h-16 bg-navy-950/50 rounded-full flex items-center justify-center mx-auto border border-white/5 shadow-inner">
+                  <MessageSquare className="w-6 h-6 text-navy-700" />
+               </div>
+               <p className="text-[10px] font-black text-navy-500 uppercase tracking-[0.2em] italic">Your journey begins with a single question.</p>
             </div>
           ) : (
             conversations.map((conv) => (
-              <div
-                key={conv.id}
-                className={`group flex flex-col gap-1 px-4 py-3.5 rounded-2xl cursor-pointer transition-all border ${
-                  activeConversation?.id === conv.id
-                    ? 'bg-navy-800 border-gold-400/30 text-white shadow-xl shadow-black/20'
-                    : 'text-navy-400 border-transparent hover:bg-navy-800/40 hover:text-navy-200'
-                }`}
-                onClick={() => selectConversation(conv)}
-              >
+              <div key={conv.id} onClick={() => { setActiveConversation(conv); setSidebarOpen(false); }} className={`group p-4 rounded-2xl cursor-pointer transition-all border ${activeConversation?.id === conv.id ? 'bg-white/5 border-white/10 text-white' : 'text-navy-500 border-transparent hover:bg-white/5 hover:text-navy-200'}`}>
                 <div className="flex items-center gap-3">
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                    activeConversation?.id === conv.id ? 'bg-gold-400/10 text-gold-400' : 'bg-navy-800/50 text-navy-600'
-                  }`}>
-                    <MessageSquare className="w-4 h-4" />
-                  </div>
-                  <span className="text-sm truncate flex-1 font-semibold">{conv.title}</span>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      deleteConversation(conv.id);
-                    }}
-                    className="opacity-0 group-hover:opacity-100 p-1.5 hover:text-red-400 transition-all hover:bg-red-400/10 rounded-lg"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-                <div className="flex items-center gap-2 pl-11">
-                  <Clock className="w-3 h-3 text-navy-600" />
-                  <span className="text-[10px] text-navy-600 font-bold uppercase tracking-wider">
-                    {new Date(conv.updated_at).toLocaleDateString()}
-                  </span>
+                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${activeConversation?.id === conv.id ? 'bg-gold-400/10 text-gold-400' : 'bg-navy-950/50 text-navy-700 group-hover:text-navy-400'}`}>
+                      <Scroll className="w-5 h-5" />
+                   </div>
+                   <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold truncate">{conv.title}</p>
+                      <p className="text-[9px] font-black uppercase tracking-widest text-navy-600 mt-0.5">{new Date(conv.updated_at).toLocaleDateString()}</p>
+                   </div>
+                   <button onClick={(e) => { e.stopPropagation(); deleteConversation(conv.id); }} className="opacity-0 group-hover:opacity-100 p-2 text-navy-600 hover:text-red-400 transition-all">
+                      <Trash2 className="w-4 h-4" />
+                   </button>
                 </div>
               </div>
             ))
           )}
         </div>
 
-        {/* Usage section */}
-        <div className="p-5 border-t border-navy-800/50 bg-navy-900/50">
-          {!isPro && usage.limit !== null ? (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-gold-400" />
-                  <span className="text-xs font-bold text-navy-300 uppercase tracking-wider">Usage</span>
+        {/* Usage Section */}
+        <div className="p-6 border-t border-white/5 bg-navy-950/50">
+           {!isPro ? (
+             <div className="space-y-4">
+                <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest">
+                   <span className="text-navy-500">Daily Presence</span>
+                   <span className="text-gold-400">{usage.used}/{usage.limit} Used</span>
                 </div>
-                <span className="text-xs font-bold text-white">
-                  {usage.used} <span className="text-navy-500">/</span> {usage.limit}
-                </span>
-              </div>
-              <div className="h-2 bg-navy-800 rounded-full overflow-hidden p-[2px]">
-                <div
-                  className={`h-full rounded-full transition-all duration-1000 ease-out shadow-[0_0_8px_rgba(251,191,36,0.2)] ${
-                    usagePercent >= 100 ? 'bg-red-500' : usagePercent >= 80 ? 'bg-amber-500' : 'bg-gold-gradient'
-                  }`}
-                  style={{ width: `${usagePercent}%` }}
-                />
-              </div>
-              <button
-                onClick={() => setShowUpgradeModal(true)}
-                className="w-full bg-navy-800 border border-gold-400/20 text-gold-400 text-[11px] font-bold py-2.5 rounded-xl hover:bg-gold-400 hover:text-navy-950 transition-all uppercase tracking-widest"
-              >
-                Go Unlimited
-              </button>
-            </div>
-          ) : (
-            <div className="flex items-center justify-between bg-gold-400/5 border border-gold-400/20 p-4 rounded-2xl">
-              <div className="flex items-center gap-3">
+                <div className="h-1.5 w-full bg-navy-900 rounded-full overflow-hidden">
+                   <div className="h-full bg-gold-gradient transition-all duration-1000" style={{ width: `${usagePercent}%` }} />
+                </div>
+                <button onClick={() => setShowUpgradeModal(true)} className="w-full text-[10px] font-black uppercase tracking-[0.2em] text-gold-400 hover:text-white transition-colors py-2">
+                   Upgrade to Unlimited
+                </button>
+             </div>
+           ) : (
+             <div className="flex items-center gap-4 bg-gold-400/5 border border-gold-400/10 p-4 rounded-2xl">
                 <div className="w-10 h-10 bg-gold-gradient rounded-xl flex items-center justify-center shadow-lg shadow-gold-400/20">
-                  <Sparkles className="w-5 h-5 text-navy-950" />
+                   <Crown className="w-5 h-5 text-navy-950" />
                 </div>
                 <div>
-                  <p className="text-xs font-bold text-white">Pro Status</p>
-                  <p className="text-[10px] font-medium text-gold-400 uppercase tracking-widest">Unlimited Chat</p>
+                   <p className="text-[10px] font-black text-white uppercase tracking-widest">Pro Disciple</p>
+                   <p className="text-[8px] font-black text-gold-400/70 uppercase tracking-[0.2em]">Unlimited Insights</p>
                 </div>
-              </div>
-            </div>
-          )}
+             </div>
+           )}
         </div>
       </aside>
 
       {/* ── Main Chat ── */}
-      <div className="flex-1 flex flex-col min-w-0 relative">
-        {/* Header */}
-        <header className="flex items-center gap-4 px-6 py-5 border-b border-navy-800/50 bg-navy-950/80 backdrop-blur-xl relative z-20">
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className="lg:hidden text-navy-400 hover:text-white p-2 hover:bg-navy-800 rounded-xl transition-all"
-          >
-            <ChevronLeft className="w-6 h-6" />
-          </button>
-          
-          <div className="w-12 h-12 bg-navy-900 border border-gold-400/30 rounded-2xl flex items-center justify-center shadow-2xl relative group">
-             <div className="absolute inset-0 bg-gold-400/10 rounded-2xl blur-md group-hover:bg-gold-400/20 transition-all" />
-             <Cross className="w-6 h-6 text-gold-400 relative z-10" />
-          </div>
-
-          <div className="flex-1 min-w-0">
-            <h1 className="text-lg font-bold text-white truncate tracking-tight">
-              {activeConversation?.title || 'Bible Chat'}
-            </h1>
-            <div className="flex items-center gap-2 mt-0.5">
-              <div className={`w-2 h-2 rounded-full ${isTyping ? 'bg-gold-400 animate-pulse' : 'bg-emerald-500'}`} />
-              <span className="text-[11px] font-bold text-navy-400 uppercase tracking-widest">
-                {isTyping ? 'Thinking...' : 'AI Bible Scholar'}
-              </span>
-            </div>
-          </div>
-        </header>
-
-        {/* Messages Content */}
-        <div className="flex-1 overflow-y-auto pb-40 lg:pb-8">
-          {messages.length === 0 && !loadingMessages ? (
-            <div className="max-w-2xl mx-auto px-6 pt-12 lg:pt-20 text-center animate-slide-up-fade">
-              <div className="w-24 h-24 bg-gold-400/5 border border-gold-400/10 rounded-[2rem] flex items-center justify-center mx-auto mb-8 shadow-2xl animate-float">
-                <Bot className="w-12 h-12 text-gold-400" />
+      <div className="flex-1 flex flex-col min-w-0 bg-navy-950 relative overflow-hidden">
+        
+        {/* Header with Persona Selector */}
+        <header className="px-6 py-6 border-b border-white/5 bg-navy-950/80 backdrop-blur-2xl flex items-center justify-between z-30">
+           <div className="flex items-center gap-4">
+              <button onClick={() => setSidebarOpen(true)} className="lg:hidden text-navy-500 hover:text-white p-2">
+                 <ChevronLeft className="w-6 h-6" />
+              </button>
+              <div className="flex items-center gap-4">
+                 <div className={`w-12 h-12 ${currentPersona.bg} rounded-2xl flex items-center justify-center shadow-2xl relative group`}>
+                    <div className={`absolute inset-0 ${currentPersona.bg} blur-md opacity-50`} />
+                    <currentPersona.icon className={`w-6 h-6 ${currentPersona.color} relative z-10`} />
+                 </div>
+                 <div>
+                    <h1 className="text-xl font-black text-white tracking-tighter uppercase italic">{activeConversation?.title || 'Sanctuary Chat'}</h1>
+                    <div className="flex items-center gap-2">
+                       <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+                       <span className="text-[9px] font-black text-navy-500 uppercase tracking-[0.2em]">{currentPersona.name} &bull; Online</span>
+                    </div>
+                 </div>
               </div>
-              <h2 className="text-3xl font-bold text-white mb-4 tracking-tight">Spirit-Led Conversations</h2>
-              <p className="text-navy-300 text-lg mb-12 leading-relaxed">
-                Explore the depth of scripture, find comfort in God&apos;s promises, and grow in your spiritual walk through AI-guided biblical insights.
-              </p>
-              
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-left">
-                {[
-                  { icon: '🙏', text: 'How do I deepen my prayer life?' },
-                  { icon: '💡', text: 'Explain the concept of grace' },
-                  { icon: '🌊', text: 'Verses for finding peace' },
-                  { icon: '✨', text: 'Meaning of John 3:16' }
-                ].map((item, i) => (
-                  <button
-                    key={i}
-                    onClick={() => { setInput(item.text); inputRef.current?.focus(); }}
-                    className="group bg-navy-900/40 border border-navy-800/50 rounded-2xl p-5 hover:bg-navy-800/60 hover:border-gold-400/30 transition-all duration-300 flex items-center gap-4 shadow-xl shadow-black/20"
-                    style={{ animationDelay: `${i * 0.1}s` }}
-                  >
-                    <span className="text-2xl grayscale group-hover:grayscale-0 transition-all duration-300">{item.icon}</span>
-                    <span className="text-sm font-semibold text-navy-200 group-hover:text-white transition-colors">{item.text}</span>
-                    <ChevronRight className="w-4 h-4 text-navy-600 ml-auto group-hover:text-gold-400 group-hover:translate-x-1 transition-all" />
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <div className="max-w-4xl mx-auto px-6 py-10 space-y-10">
-              {messages.map((message, idx) => {
-                const isAI = message.role === 'assistant';
-                const userName = user?.user_metadata?.full_name || user?.email || 'Disciple';
-                const userInitial = userName.charAt(0).toUpperCase();
+           </div>
 
-                return (
-                  <div
-                    key={message.id}
-                    className={`flex gap-4 sm:gap-6 animate-slide-up-fade ${!isAI ? 'flex-row-reverse' : ''}`}
-                    style={{ animationDelay: `${idx * 0.05}s` }}
-                  >
-                    {/* Avatar */}
-                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 border-2 shadow-2xl transition-all duration-500 group ${
-                      isAI ? 'bg-navy-900 border-gold-400/20' : 'bg-gold-gradient border-gold-300 text-navy-950 font-bold'
-                    }`}>
-                      {isAI ? <Bot className="w-6 h-6 text-gold-400" /> : <span className="text-xl">{userInitial}</span>}
-                    </div>
+           {/* Persona Switcher */}
+           <div className="relative">
+              <button onClick={() => setShowPersonaMenu(!showPersonaMenu)} className="flex items-center gap-3 bg-white/5 border border-white/10 px-4 py-2.5 rounded-2xl hover:bg-white/10 transition-all">
+                 <div className={`w-5 h-5 ${currentPersona.bg} rounded flex items-center justify-center`}>
+                    <currentPersona.icon className={`w-3 h-3 ${currentPersona.color}`} />
+                 </div>
+                 <span className="text-[10px] font-black text-white uppercase tracking-widest hidden sm:inline">{currentPersona.name}</span>
+                 <ChevronDown className={`w-4 h-4 text-navy-600 transition-transform ${showPersonaMenu ? 'rotate-180' : ''}`} />
+              </button>
 
-                    {/* Bubble */}
-                    <div className={`flex flex-col ${!isAI ? 'items-end' : 'items-start'} max-w-[85%] sm:max-w-[75%]`}>
-                      <div className={`relative px-6 py-5 rounded-[2rem] text-[15px] leading-relaxed shadow-2xl transition-all duration-500 ${
-                        isAI 
-                          ? 'bg-navy-900/60 backdrop-blur-md border border-white/5 text-navy-100 rounded-tl-none' 
-                          : 'bg-navy-800 border border-navy-700 text-white rounded-tr-none'
-                      }`}>
-                        {isAI && idx === messages.length - 1 && !isTyping ? (
-                          <TypewriterMessage
-                            content={message.content}
-                            onVerseClick={handleVerseClick}
-                            onComplete={scrollToBottom}
-                          />
-                        ) : (
-                          <div className="whitespace-pre-wrap break-words">
-                            {isAI ? formatMessageContent(message.content, handleVerseClick) : message.content}
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2 mt-2 px-2">
-                        <span className="text-[10px] font-bold text-navy-600 uppercase tracking-widest">
-                          {isAI ? 'Bible Scholar' : userName.split(' ')[0]}
-                        </span>
-                        <span className="w-1 h-1 bg-navy-800 rounded-full" />
-                        <span className="text-[10px] font-bold text-navy-700 uppercase tracking-widest">
-                          {message.created_at ? new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Now'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-
-              {isTyping && (
-                <div className="flex gap-4 sm:gap-6 animate-slide-up-fade">
-                  <div className="w-12 h-12 bg-navy-900 border border-gold-400/20 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-2xl">
-                    <Loader2 className="w-6 h-6 animate-spin text-gold-400" />
-                  </div>
-                  <div className="bg-navy-900/40 backdrop-blur-md border border-white/5 rounded-[2rem] px-8 py-5 shadow-2xl rounded-tl-none">
-                    <div className="flex gap-2">
-                      <div className="w-2.5 h-2.5 bg-gold-400 rounded-full animate-pulse-typing" />
-                      <div className="w-2.5 h-2.5 bg-gold-400 rounded-full animate-pulse-typing [animation-delay:0.2s]" />
-                      <div className="w-2.5 h-2.5 bg-gold-400 rounded-full animate-pulse-typing [animation-delay:0.4s]" />
-                    </div>
-                  </div>
+              {showPersonaMenu && (
+                <div className="absolute top-full right-0 mt-3 w-72 bg-navy-900 border border-white/10 rounded-[2rem] shadow-2xl p-3 animate-scale-in z-50">
+                   {PERSONAS.map(p => (
+                     <button key={p.id} onClick={() => { setActivePersona(p.id); setShowPersonaMenu(false); }} className={`w-full flex items-start gap-4 p-4 rounded-2xl transition-all mb-1 ${activePersona === p.id ? 'bg-white/5 border border-white/10' : 'hover:bg-white/5 border border-transparent'}`}>
+                        <div className={`w-10 h-10 ${p.bg} rounded-xl flex items-center justify-center flex-shrink-0`}>
+                           <p.icon className={`w-5 h-5 ${p.color}`} />
+                        </div>
+                        <div className="text-left min-w-0">
+                           <p className="text-xs font-black text-white uppercase tracking-widest">{p.name}</p>
+                           <p className="text-[9px] text-navy-500 font-medium leading-relaxed mt-1">{p.description}</p>
+                        </div>
+                     </button>
+                   ))}
                 </div>
               )}
+           </div>
+        </header>
 
-              <div ref={messagesEndRef} />
-            </div>
-          )}
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto scrollbar-none pb-40 lg:pb-12 px-6 sm:px-12 py-10">
+           {messages.length === 0 && !loadingMessages ? (
+             <div className="max-w-3xl mx-auto text-center space-y-12 py-20">
+                <div className="w-24 h-24 bg-white/2 border border-white/5 rounded-[2.5rem] flex items-center justify-center mx-auto animate-float shadow-2xl">
+                   <Sparkles className="w-10 h-10 text-gold-400" />
+                </div>
+                <div className="space-y-4">
+                   <h2 className="text-4xl sm:text-5xl font-black text-white tracking-tighter uppercase italic">Seek & Find</h2>
+                   <p className="text-navy-400 text-lg max-w-xl mx-auto">Your personal sanctuary for biblical exploration. Ask about life, faith, or the deep mysteries of the Word.</p>
+                </div>
+                <div className="grid sm:grid-cols-2 gap-4 text-left">
+                   {[
+                     'What does the Bible say about finding peace?',
+                     'How do I stay strong in difficult times?',
+                     'Explain the concept of Divine Grace',
+                     'Give me a morning prayer for my family'
+                   ].map((q, i) => (
+                     <button key={i} onClick={() => setInput(q)} className="p-6 bg-navy-900/40 border border-white/5 rounded-[2rem] hover:border-gold-400/30 transition-all group flex items-center justify-between">
+                        <span className="text-xs font-black text-navy-300 group-hover:text-white uppercase tracking-widest leading-relaxed flex-1">{q}</span>
+                        <ChevronRight className="w-4 h-4 text-navy-700 group-hover:text-gold-400 group-hover:translate-x-1 transition-all" />
+                     </button>
+                   ))}
+                </div>
+             </div>
+           ) : (
+             <div className="max-w-4xl mx-auto space-y-12">
+                {messages.map((m, i) => (
+                  <div key={i} className={`flex gap-6 animate-slide-up-fade ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
+                     <div className={`w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-2xl transition-all ${m.role === 'user' ? 'bg-gold-gradient text-navy-950 font-black' : `${currentPersona.bg} border border-white/5`}`}>
+                        {m.role === 'user' ? user?.email?.[0]?.toUpperCase() : <currentPersona.icon className={`w-6 h-6 ${currentPersona.color}`} />}
+                     </div>
+                     <div className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'} max-w-[85%] sm:max-w-[75%]`}>
+                        <div className={`p-6 rounded-[2.5rem] text-[15px] leading-relaxed shadow-2xl transition-all ${m.role === 'user' ? 'bg-navy-800 border border-navy-700 text-white rounded-tr-none' : 'bg-navy-900/60 backdrop-blur-md border border-white/5 text-navy-100 rounded-tl-none'}`}>
+                           {m.role === 'assistant' && i === messages.length - 1 && !isTyping ? (
+                             <TypewriterMessage content={m.content} onVerseClick={handleVerseClick} onComplete={scrollToBottom} />
+                           ) : (
+                             <div className="whitespace-pre-wrap">{m.role === 'assistant' ? formatMessageContent(m.content, handleVerseClick) : m.content}</div>
+                           )}
+                        </div>
+                        <div className="flex items-center gap-2 mt-3 px-4">
+                           <span className="text-[9px] font-black text-navy-600 uppercase tracking-widest">{m.role === 'user' ? 'Disciple' : currentPersona.name}</span>
+                           <span className="w-1 h-1 bg-navy-800 rounded-full" />
+                           <span className="text-[9px] font-black text-navy-700 uppercase tracking-widest">{m.created_at ? new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Now'}</span>
+                        </div>
+                     </div>
+                  </div>
+                ))}
+                {isTyping && (
+                  <div className="flex gap-6 animate-slide-up-fade">
+                     <div className={`w-12 h-12 ${currentPersona.bg} border border-white/5 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-2xl`}>
+                        <Loader2 className={`w-6 h-6 animate-spin ${currentPersona.color}`} />
+                     </div>
+                     <div className="bg-navy-900/40 backdrop-blur-md border border-white/5 rounded-[2.5rem] px-8 py-5 rounded-tl-none shadow-2xl flex gap-2">
+                        {[1, 2, 3].map(j => <div key={j} className={`w-2 h-2 ${currentPersona.bg.replace('/10', '/40')} rounded-full animate-pulse`} style={{ animationDelay: `${j * 0.2}s` }} />)}
+                     </div>
+                  </div>
+                )}
+                <div ref={messagesEndRef} />
+             </div>
+           )}
         </div>
 
-        {/* ── Input Bar ── */}
-        <div className="fixed lg:absolute bottom-0 left-0 right-0 z-30 p-4 sm:p-6 lg:p-8 bg-gradient-to-t from-navy-950 via-navy-950/90 to-transparent">
-          <div className="max-w-4xl mx-auto">
-            
-            {isCooldownActive && (
-              <div className="mb-4 flex items-center justify-center gap-3 bg-amber-500/10 border border-amber-500/20 rounded-2xl px-6 py-3.5 animate-slide-up-fade shadow-xl">
-                <div className="w-8 h-8 rounded-full bg-amber-500/10 flex items-center justify-center animate-glow-pulse">
-                  <Clock className="w-4 h-4 text-amber-500" />
+        {/* Input */}
+        <div className="fixed lg:absolute bottom-0 left-0 right-0 p-6 sm:p-10 bg-gradient-to-t from-navy-950 via-navy-950/90 to-transparent z-30">
+           <div className="max-w-4xl mx-auto space-y-4">
+              {isCooldownActive && (
+                <div className="bg-amber-400/10 border border-amber-400/20 rounded-2xl p-4 flex items-center justify-between animate-slide-up-fade">
+                   <div className="flex items-center gap-3">
+                      <Clock className="w-4 h-4 text-amber-500 animate-pulse" />
+                      <p className="text-[10px] font-black text-amber-400 uppercase tracking-[0.2em]">Presence Cooldown: {formatCountdown(cooldownRemaining)}</p>
+                   </div>
+                   <button onClick={() => setShowUpgradeModal(true)} className="text-[10px] font-black text-white uppercase tracking-widest bg-amber-500 px-4 py-2 rounded-xl">Unlock Pro</button>
                 </div>
-                <div className="flex-1">
-                  <p className="text-sm text-amber-200 font-bold tracking-tight">Daily message limit reached</p>
-                  <p className="text-[11px] text-amber-500/80 font-bold uppercase tracking-wider">Cooldown: {formatCountdown(cooldownRemaining)} remaining</p>
-                </div>
-                <button
-                  onClick={() => setShowUpgradeModal(true)}
-                  className="bg-amber-500 text-navy-950 text-xs font-black px-4 py-2 rounded-xl hover:bg-amber-400 transition-all uppercase tracking-tighter"
-                >
-                  Upgrade Now
-                </button>
+              )}
+              <div className={`bg-navy-900/80 backdrop-blur-3xl border-2 rounded-[2.5rem] p-3 transition-all flex items-end gap-4 shadow-2xl ${isCooldownActive ? 'border-amber-500/20 opacity-50' : 'border-white/5 focus-within:border-gold-400/40'}`}>
+                 <textarea ref={inputRef} value={input} onChange={(e) => { setInput(e.target.value); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 160) + 'px'; }} onKeyDown={handleKeyDown} disabled={isTyping || isCooldownActive} placeholder={isCooldownActive ? 'Resting...' : placeholders[placeholderIndex]} className="flex-1 bg-transparent border-none focus:ring-0 text-white placeholder-navy-700 py-4 pl-6 text-sm resize-none scrollbar-none font-medium" rows={1} />
+                 <button onClick={handleSend} disabled={isTyping || isCooldownActive || !input.trim()} className={`w-14 h-14 rounded-full flex items-center justify-center transition-all shadow-xl ${input.trim() ? 'bg-gold-gradient text-navy-950 hover:scale-110 active:scale-95' : 'bg-navy-800 text-navy-700 cursor-not-allowed'}`}>
+                    <Send className="w-6 h-6" />
+                 </button>
               </div>
-            )}
-
-            <div className={`flex items-end gap-3 bg-navy-900/80 backdrop-blur-2xl border-2 rounded-[2.5rem] p-3 transition-all duration-500 shadow-[0_32px_64px_-12px_rgba(0,0,0,0.5)] ${
-              isCooldownActive ? 'border-amber-500/20 opacity-50' : 'border-white/5 focus-within:border-gold-400/40 focus-within:shadow-[0_0_40px_rgba(251,191,36,0.1)]'
-            }`}>
-              <textarea
-                ref={inputRef}
-                value={input}
-                onChange={handleInputChange}
-                onKeyDown={handleKeyDown}
-                disabled={inputDisabled}
-                placeholder={isCooldownActive ? 'Wait for cooldown...' : placeholders[placeholderIndex]}
-                className="flex-1 bg-transparent border-none focus:ring-0 text-white placeholder-navy-600 py-3 pl-4 pr-2 text-[15px] resize-none max-h-40 font-medium scrollbar-none"
-                rows={1}
-              />
-              <button
-                onClick={handleSend}
-                disabled={inputDisabled || !input.trim()}
-                className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 shadow-xl ${
-                  input.trim() && !inputDisabled
-                    ? 'bg-gold-gradient text-navy-950 hover:scale-110 rotate-0'
-                    : 'bg-navy-800 text-navy-600 -rotate-45'
-                }`}
-              >
-                <Send className="w-5 h-5" />
-              </button>
-            </div>
-            
-            <p className="text-center text-[10px] text-navy-600 mt-4 font-bold uppercase tracking-widest">
-              Guided by Scripture &bull; Compassionate Wisdom
-            </p>
-          </div>
+              <p className="text-center text-[9px] font-black text-navy-600 uppercase tracking-[0.4em]">Guided by Wisdom &bull; Steeped in Grace</p>
+           </div>
         </div>
       </div>
-
-      <UpgradeModal 
-        open={showUpgradeModal} 
-        onClose={() => setShowUpgradeModal(false)}
-        limitType="ai_messages"
-      />
     </div>
   );
 }

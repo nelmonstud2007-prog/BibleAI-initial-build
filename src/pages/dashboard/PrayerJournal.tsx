@@ -13,6 +13,11 @@ import {
   Loader2,
   Share2,
   MessageSquare,
+  Sparkles,
+  Zap,
+  Target,
+  ArrowRight,
+  Filter
 } from 'lucide-react';
 import UpgradeModal from '../../components/UpgradeModal';
 import { trackEvent } from '../../lib/analytics';
@@ -159,6 +164,7 @@ export default function PrayerJournal() {
   const [shareOpen, setShareOpen] = useState(false);
   const [shareHeading, setShareHeading] = useState('');
   const [shareContent, setShareContent] = useState('');
+  const [filter, setFilter] = useState<'all' | 'praying' | 'answered'>('all');
 
   useEffect(() => {
     if (user) {
@@ -171,7 +177,6 @@ export default function PrayerJournal() {
     if (!user) return;
     const today = new Date().toISOString().split('T')[0];
 
-    // Check if streak already exists for today to avoid 403 on upsert without UPDATE policy
     const { data: existingStreak } = await supabase
       .from('prayer_streaks')
       .select('id')
@@ -223,7 +228,6 @@ export default function PrayerJournal() {
     if (!user) return;
     const today = new Date().toISOString().split('T')[0];
 
-    // Count consecutive days ending today
     const { data: streaks, error } = await supabase
       .from('prayer_streaks')
       .select('date')
@@ -264,16 +268,6 @@ export default function PrayerJournal() {
   const addEntry = async () => {
     if (!user || !title.trim() || savingEntry) return;
 
-    // Duplicate check
-    const isDuplicate = entries.some(
-      (e) => e.title.toLowerCase() === title.trim().toLowerCase()
-    );
-    if (isDuplicate) {
-      alert('You already have a prayer with this title');
-      return;
-    }
-
-    // Check prayer limit for free users
     if (!isPro && entries.length >= 10) {
       setShowUpgrade(true);
       return;
@@ -333,6 +327,11 @@ export default function PrayerJournal() {
     }
   };
 
+  const filteredEntries = entries.filter(e => {
+    if (filter === 'all') return true;
+    return e.status === filter;
+  });
+
   const totalPrayers = entries.length;
   const answeredPrayers = entries.filter((e) => e.status === 'answered').length;
 
@@ -348,7 +347,7 @@ export default function PrayerJournal() {
   };
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-10 max-w-6xl mx-auto space-y-10 animate-slide-up-fade">
       <ConfettiCanvas active={confettiActive} />
       <UpgradeModal
         open={showUpgrade}
@@ -363,302 +362,231 @@ export default function PrayerJournal() {
         content={shareContent}
       />
 
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-white">Prayer Journal</h1>
-          <p className="mt-1 text-sm text-navy-300">Record your prayers and watch God move</p>
+      {/* Header & Quick Action */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-navy-900/40 border border-white/5 rounded-[2.5rem] p-8 sm:p-10 relative overflow-hidden group">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-gold-400/5 rounded-full blur-[80px] -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+        
+        <div className="relative space-y-2">
+          <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight">Sacred Journal</h1>
+          <p className="text-navy-300 font-medium">Record your heart&apos;s cries and watch God&apos;s faithful hand move.</p>
         </div>
+
         <button
           onClick={() => setShowForm(!showForm)}
-          className="flex items-center gap-2 bg-gold-400 text-navy-950 font-semibold px-4 py-2.5 rounded-xl hover:bg-gold-300 transition-colors text-sm"
+          className="relative group bg-gold-gradient text-navy-950 font-black px-8 py-4 rounded-2xl shadow-xl shadow-gold-400/10 hover:scale-[1.03] active:scale-[0.97] transition-all flex items-center justify-center gap-3 overflow-hidden"
         >
-          <Plus className="w-4 h-4" />
-          <span className="hidden sm:inline">New Prayer</span>
+          <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-500" />
+          <Plus className="w-5 h-5 relative z-10" />
+          <span className="relative z-10 uppercase tracking-widest text-xs">New Petition</span>
         </button>
       </div>
 
-      {/* Stats bar */}
-      <div className="grid grid-cols-3 gap-3 sm:gap-4 mb-8">
-        <div className="bg-navy-900/50 border border-navy-800 rounded-xl p-4 text-center">
-          <BookOpen className="w-5 h-5 text-gold-400 mx-auto mb-2" />
-          <p className="text-2xl font-bold text-white">{totalPrayers}</p>
-          <p className="text-xs text-navy-400 mt-0.5">Total Prayers</p>
-        </div>
-        <div className="bg-navy-900/50 border border-navy-800 rounded-xl p-4 text-center">
-          <Check className="w-5 h-5 text-emerald-400 mx-auto mb-2" />
-          <p className="text-2xl font-bold text-white">{answeredPrayers}</p>
-          <p className="text-xs text-navy-400 mt-0.5">Answered</p>
-        </div>
-        <div className="bg-navy-900/50 border border-navy-800 rounded-xl p-4 text-center">
-          <Flame className="w-5 h-5 text-amber-400 mx-auto mb-2" />
-          <p className="text-2xl font-bold text-white">{streak}</p>
-          <p className="text-xs text-navy-400 mt-0.5">Day Streak</p>
-        </div>
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 animate-slide-up-fade [animation-delay:100ms]">
+         {[
+           { label: 'Petitions', val: totalPrayers, icon: BookOpen, color: 'text-gold-400', bg: 'bg-gold-400/10' },
+           { label: 'Answered', val: answeredPrayers, icon: Check, color: 'text-emerald-400', bg: 'bg-emerald-400/10' },
+           { label: 'Day Streak', val: streak, icon: Flame, color: 'text-amber-400', bg: 'bg-amber-400/10' }
+         ].map((stat, i) => (
+           <div key={i} className="bg-navy-900/40 border border-white/5 rounded-3xl p-6 flex items-center gap-6 group hover:border-white/10 transition-colors">
+              <div className={`w-14 h-14 ${stat.bg} rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-500`}>
+                 <stat.icon className={`w-7 h-7 ${stat.color}`} />
+              </div>
+              <div>
+                 <p className="text-3xl font-black text-white">{stat.val}</p>
+                 <p className="text-[10px] font-black text-navy-500 uppercase tracking-[0.2em]">{stat.label}</p>
+              </div>
+           </div>
+         ))}
       </div>
 
-      {/* New Prayer Form */}
-      {showForm && (
-        <div className="bg-navy-900/50 border border-navy-800 rounded-2xl p-6 mb-8">
-          <h2 className="text-base font-semibold text-white mb-4">New Prayer</h2>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-navy-200 mb-1.5">Title</label>
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="What are you praying for?"
-                className="w-full bg-navy-800 border border-navy-700 rounded-xl px-4 py-3 text-sm text-white placeholder-navy-400 focus:outline-none focus:border-gold-400/50 focus:ring-1 focus:ring-gold-400/50 transition-colors"
-              />
-            </div>
+      {/* Form & List Container */}
+      <div className="grid lg:grid-cols-12 gap-10">
+        
+        {/* Main Section */}
+        <div className="lg:col-span-8 space-y-8">
+           
+           {/* Filters */}
+           <div className="flex items-center gap-3 bg-navy-900/40 border border-white/5 p-2 rounded-2xl w-fit">
+              {(['all', 'praying', 'answered'] as const).map((f) => (
+                <button
+                  key={f}
+                  onClick={() => setFilter(f)}
+                  className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+                    filter === f 
+                      ? 'bg-gold-gradient text-navy-950 shadow-lg' 
+                      : 'text-navy-400 hover:text-white'
+                  }`}
+                >
+                  {f}
+                </button>
+              ))}
+           </div>
 
-            <div>
-              <label className="block text-sm font-medium text-navy-200 mb-1.5">Description</label>
-              <textarea
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                placeholder="Share your heart with God..."
-                rows={3}
-                className="w-full bg-navy-800 border border-navy-700 rounded-xl px-4 py-3 text-sm text-white placeholder-navy-400 focus:outline-none focus:border-gold-400/50 focus:ring-1 focus:ring-gold-400/50 transition-colors resize-none"
-              />
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-navy-200 mb-1.5">Category</label>
-                <div className="relative">
-                  <select
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value)}
-                    className="w-full appearance-none bg-navy-800 border border-navy-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-gold-400/50 focus:ring-1 focus:ring-gold-400/50 transition-colors"
-                  >
-                    {CATEGORIES.map((cat) => (
-                      <option key={cat} value={cat}>
-                        {cat}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-navy-400 pointer-events-none" />
+           {/* Prayer List */}
+           {loading ? (
+             <div className="flex flex-col items-center justify-center py-20 gap-4">
+                <Loader2 className="w-10 h-10 text-gold-400 animate-spin" />
+                <p className="text-xs font-black text-navy-500 uppercase tracking-widest">Opening the scrolls...</p>
+             </div>
+           ) : filteredEntries.length === 0 ? (
+             <div className="bg-navy-900/40 border border-white/5 rounded-[2.5rem] p-16 text-center space-y-6">
+                <div className="w-20 h-20 bg-navy-950/50 rounded-full flex items-center justify-center mx-auto border border-white/5 shadow-inner">
+                   <Target className="w-8 h-8 text-navy-700" />
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-navy-200 mb-1.5">Status</label>
-                <div className="flex gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setStatus('praying')}
-                    className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
-                      status === 'praying'
-                        ? 'bg-amber-400/15 border border-amber-400/30 text-amber-400'
-                        : 'bg-navy-800 border border-navy-700 text-navy-400 hover:text-white'
-                    }`}
-                  >
-                    <Heart className="w-4 h-4" />
-                    Praying
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setStatus('answered')}
-                    className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
-                      status === 'answered'
-                        ? 'bg-emerald-400/15 border border-emerald-400/30 text-emerald-400'
-                        : 'bg-navy-800 border border-navy-700 text-navy-400 hover:text-white'
-                    }`}
-                  >
-                    <Check className="w-4 h-4" />
-                    Answered
-                  </button>
+                <div className="space-y-2">
+                  <h3 className="text-xl font-bold text-white">Silence is a season, not a state.</h3>
+                  <p className="text-navy-400 text-sm max-w-xs mx-auto italic">Capture your first petition to begin tracking your spiritual journey.</p>
                 </div>
-              </div>
-            </div>
-
-            <div className="flex gap-3 pt-2">
-              <button
-                onClick={addEntry}
-                disabled={!title.trim() || savingEntry}
-                className="bg-gold-400 text-navy-950 font-semibold px-6 py-2.5 rounded-xl hover:bg-gold-300 transition-colors text-sm disabled:opacity-40"
-              >
-                {savingEntry ? (
-                  <span className="flex items-center gap-2">
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Saving...
-                  </span>
-                ) : (
-                  'Save Prayer'
-                )}
-              </button>
-              <button
-                onClick={() => setShowForm(false)}
-                className="bg-navy-800 text-navy-300 font-medium px-6 py-2.5 rounded-xl hover:text-white transition-colors text-sm border border-navy-700"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Prayer Cards Grid */}
-      {loading ? (
-        <div className="flex items-center justify-center py-20">
-          <div className="w-8 h-8 border-2 border-gold-400 border-t-transparent rounded-full animate-spin" />
-        </div>
-      ) : entries.length === 0 ? (
-        <div className="text-center py-20 px-4">
-          <div className="mx-auto w-full max-w-lg bg-gradient-to-br from-navy-900/70 to-navy-900/40 border border-gold-400/20 rounded-3xl p-8 sm:p-10">
-            <div className="w-20 h-20 rounded-2xl bg-gold-400/10 border border-gold-400/20 flex items-center justify-center mx-auto mb-6">
-              <span className="text-4xl" role="img" aria-label="Praying hands">
-                🙏
-              </span>
-            </div>
-            <h3 className="text-2xl font-bold text-white mb-2">Your first prayer starts here</h3>
-            <p className="text-sm text-navy-300 mb-7">
-              Capture what is on your heart and begin your prayer journey with faith.
-            </p>
-            <button
-              onClick={() => setShowForm(true)}
-              className="inline-flex items-center gap-2 bg-gold-400 text-navy-950 font-semibold px-6 py-3 rounded-xl hover:bg-gold-300 transition-all duration-200 hover:-translate-y-0.5"
-            >
-              <Plus className="w-4 h-4" />
-              Add Prayer
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {entries.map((entry) => {
-            const catConfig = CATEGORY_CONFIG[entry.category] || CATEGORY_CONFIG.Other;
-            const isAnswered = entry.status === 'answered';
-            const isJustAnswered = justAnsweredId === entry.id;
-
-            return (
-              <div
-                key={entry.id}
-                className={`group bg-navy-900/50 border rounded-2xl p-5 transition-all duration-300 relative overflow-hidden ${
-                  isJustAnswered
-                    ? 'border-emerald-400/50 shadow-lg shadow-emerald-400/10 scale-[1.02]'
-                    : isAnswered
-                      ? 'border-emerald-400/20'
-                      : 'border-navy-800 hover:border-navy-700'
-                }`}
-              >
-                {/* Answered glow effect */}
-                {isJustAnswered && (
-                  <div className="absolute inset-0 bg-emerald-400/5 animate-pulse" />
-                )}
-
-                <div className="relative">
-                  {/* Category badge + status */}
-                  <div className="flex items-center justify-between mb-3">
-                    <span
-                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium ${catConfig.bg} ${catConfig.color}`}
-                    >
-                      {entry.category}
-                    </span>
-                    <span
-                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide ${
-                        isAnswered
-                          ? 'bg-emerald-400/15 text-emerald-400'
-                          : 'bg-amber-400/15 text-amber-400'
+                <button onClick={() => setShowForm(true)} className="text-gold-400 text-xs font-black uppercase tracking-widest flex items-center gap-2 mx-auto hover:text-white transition-colors">
+                  Create First Entry <ArrowRight className="w-4 h-4" />
+                </button>
+             </div>
+           ) : (
+             <div className="grid gap-6">
+                {filteredEntries.map((entry) => {
+                  const catConfig = CATEGORY_CONFIG[entry.category] || CATEGORY_CONFIG.Other;
+                  const isAnswered = entry.status === 'answered';
+                  
+                  return (
+                    <div 
+                      key={entry.id}
+                      className={`group bg-navy-900/40 border rounded-[2rem] p-8 transition-all duration-500 relative overflow-hidden hover:shadow-2xl hover:shadow-gold-400/5 ${
+                        isAnswered ? 'border-emerald-400/10' : 'border-white/5 hover:border-gold-400/20'
                       }`}
                     >
-                      {isAnswered ? (
-                        <>
-                          <Check className="w-3 h-3" />
-                          Answered
-                        </>
-                      ) : (
-                        <>
-                          <Heart className="w-3 h-3" />
-                          Praying
-                        </>
-                      )}
-                    </span>
-                  </div>
-
-                  {/* Title */}
-                  <h3
-                    className={`text-base font-semibold mb-1.5 ${
-                      isAnswered ? 'text-emerald-300' : 'text-white'
-                    }`}
-                  >
-                    {entry.title}
-                  </h3>
-
-                  {/* Description */}
-                  {entry.content && (
-                    <p className="text-sm text-navy-300 leading-relaxed line-clamp-3 mb-3">
-                      {entry.content}
-                    </p>
-                  )}
-
-                  {/* Date */}
-                  <p className="text-xs text-navy-500 mb-3">
-                    {new Date(entry.created_at).toLocaleDateString('en-US', {
-                      month: 'short',
-                      day: 'numeric',
-                      year: 'numeric',
-                    })}
-                  </p>
-                  
-                  {/* Action buttons */}
-                  <div className="grid grid-cols-2 gap-2 mt-4">
-                    <button
-                      onClick={() => talkToAI(entry)}
-                      className="w-full flex items-center justify-center gap-2 bg-gold-400/10 border border-gold-400/20 text-gold-400 font-medium py-2 rounded-xl hover:bg-gold-400/20 transition-all text-sm"
-                    >
-                      <MessageSquare className="w-4 h-4" />
-                      Talk to AI
-                    </button>
-                    <button
-                      onClick={() => openShare(entry)}
-                      className="w-full flex items-center justify-center gap-2 bg-navy-800 border border-navy-700 text-navy-200 font-medium py-2 rounded-xl hover:text-white hover:border-navy-600 transition-all text-sm"
-                    >
-                      <Share2 className="w-4 h-4" />
-                      Share
-                    </button>
-                  </div>
-
-                  {/* Mark answered button */}
-                  {!isAnswered && (
-                    <div className="mt-2">
-                      <button
-                        onClick={() => markAnswered(entry)}
-                        disabled={Boolean(answeringId)}
-                        className="w-full flex items-center justify-center gap-2 bg-emerald-400/10 border border-emerald-400/20 text-emerald-400 font-medium py-2 rounded-xl hover:bg-emerald-400/20 transition-all text-sm disabled:opacity-60"
-                      >
-                        {answeringId === entry.id ? (
-                          <>
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            Updating...
-                          </>
-                        ) : (
-                          <>
-                            <Check className="w-4 h-4" />
-                            Answered
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Answered celebration indicator */}
-                  {isAnswered && (
-                    <div className="mt-2 flex items-center justify-center gap-2 text-emerald-400 text-sm font-medium py-2 bg-emerald-400/5 rounded-xl border border-emerald-400/10">
-                      <div className="w-5 h-5 bg-emerald-400 rounded-full flex items-center justify-center">
-                        <Check className="w-3 h-3 text-navy-950" strokeWidth={3} />
+                      {isAnswered && <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-400/5 blur-[40px] -translate-y-1/2 translate-x-1/2" />}
+                      
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                         <div className="flex items-center gap-3">
+                            <div className={`w-10 h-10 ${catConfig.bg} rounded-xl flex items-center justify-center text-xs font-black ${catConfig.color}`}>
+                               {catConfig.icon}
+                            </div>
+                            <div className="space-y-0.5">
+                               <h3 className="font-bold text-white group-hover:text-gold-400 transition-colors text-lg">{entry.title}</h3>
+                               <p className="text-[10px] font-black text-navy-500 uppercase tracking-widest">{entry.category}</p>
+                            </div>
+                         </div>
+                         <div className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border ${
+                           isAnswered ? 'bg-emerald-400/10 text-emerald-400 border-emerald-400/20' : 'bg-amber-400/10 text-amber-400 border-amber-400/20'
+                         }`}>
+                            {entry.status}
+                         </div>
                       </div>
-                      Answered
+
+                      <p className="text-navy-300 text-sm leading-relaxed mb-8 line-clamp-2 italic">"{entry.content || 'Seeking God\'s wisdom and intervention...'}"</p>
+
+                      <div className="flex flex-wrap items-center justify-between gap-6 pt-6 border-t border-white/5">
+                         <p className="text-[10px] font-bold text-navy-600 uppercase tracking-widest">
+                           Logged {new Date(entry.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}
+                         </p>
+                         <div className="flex items-center gap-3">
+                            <button 
+                              onClick={() => talkToAI(entry)}
+                              className="p-3 bg-navy-950/50 text-gold-400 rounded-xl hover:bg-gold-400/10 transition-colors border border-white/5"
+                              title="Ask AI for verses"
+                            >
+                               <MessageSquare className="w-4 h-4" />
+                            </button>
+                            <button 
+                              onClick={() => openShare(entry)}
+                              className="p-3 bg-navy-950/50 text-navy-400 rounded-xl hover:bg-white/10 transition-colors border border-white/5"
+                              title="Share as Image"
+                            >
+                               <Share2 className="w-4 h-4" />
+                            </button>
+                            {!isAnswered && (
+                              <button 
+                                onClick={() => markAnswered(entry)}
+                                className="bg-emerald-400 text-navy-950 font-black px-6 py-2.5 rounded-xl hover:bg-emerald-300 transition-all text-[10px] uppercase tracking-widest flex items-center gap-2"
+                              >
+                                {answeringId === entry.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                                Answered
+                              </button>
+                            )}
+                         </div>
+                      </div>
                     </div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+                  );
+                })}
+             </div>
+           )}
         </div>
-      )}
+
+        {/* Sidebar: Entry Form */}
+        <div className="lg:col-span-4">
+           <div className={`sticky top-8 space-y-8 transition-all duration-700 ${showForm ? 'opacity-100 translate-y-0' : 'opacity-60 grayscale-[0.5]'}`}>
+              <div className="bg-navy-900/40 border border-white/5 rounded-[2.5rem] p-8 space-y-8 relative overflow-hidden">
+                 <div className="absolute top-0 left-0 w-full h-1 bg-gold-gradient" />
+                 <div className="space-y-1">
+                    <h2 className="text-xl font-bold text-white">Add Petition</h2>
+                    <p className="text-[10px] font-black text-navy-500 uppercase tracking-widest">A dedicated space for your heart</p>
+                 </div>
+
+                 <div className="space-y-5">
+                    <div className="space-y-1.5">
+                       <label className="text-[10px] font-black text-navy-500 uppercase tracking-[0.2em] ml-2">Petition Title</label>
+                       <input 
+                         type="text" 
+                         value={title}
+                         onChange={(e) => setTitle(e.target.value)}
+                         placeholder="e.g. Strength for the week"
+                         className="w-full bg-navy-950/50 border border-white/5 rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:border-gold-400/30 transition-all placeholder:text-navy-700" 
+                       />
+                    </div>
+
+                    <div className="space-y-1.5">
+                       <label className="text-[10px] font-black text-navy-500 uppercase tracking-[0.2em] ml-2">Category</label>
+                       <div className="relative group">
+                          <select 
+                            value={category}
+                            onChange={(e) => setCategory(e.target.value)}
+                            className="w-full appearance-none bg-navy-950/50 border border-white/5 rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:border-gold-400/30 transition-all cursor-pointer"
+                          >
+                             {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                          </select>
+                          <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-navy-600 pointer-events-none group-hover:text-gold-400 transition-colors" />
+                       </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                       <label className="text-[10px] font-black text-navy-500 uppercase tracking-[0.2em] ml-2">Detailed Cry (Optional)</label>
+                       <textarea 
+                         value={content}
+                         onChange={(e) => setContent(e.target.value)}
+                         placeholder="Pour out your heart..."
+                         rows={4}
+                         className="w-full bg-navy-950/50 border border-white/5 rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:border-gold-400/30 transition-all resize-none placeholder:text-navy-700"
+                       />
+                    </div>
+
+                    <button 
+                      onClick={addEntry}
+                      disabled={!title.trim() || savingEntry}
+                      className="w-full bg-gold-gradient text-navy-950 font-black py-4 rounded-2xl shadow-xl shadow-gold-400/10 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-40"
+                    >
+                       {savingEntry ? <Loader2 className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}
+                       {savingEntry ? 'Saving to Journal...' : 'Seal with Amen'}
+                    </button>
+                 </div>
+              </div>
+
+              {/* Usage Hint */}
+              {!isPro && (
+                <div className="p-8 bg-navy-950/50 border border-navy-800 rounded-[2.5rem] space-y-4">
+                   <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-black text-navy-500 uppercase tracking-widest">Journal Capacity</span>
+                      <span className="text-[10px] font-black text-gold-400 uppercase tracking-widest">{entries.length}/10 Used</span>
+                   </div>
+                   <div className="h-1.5 w-full bg-navy-900 rounded-full overflow-hidden">
+                      <div className="h-full bg-gold-400 rounded-full transition-all duration-1000" style={{ width: `${(entries.length / 10) * 100}%` }} />
+                   </div>
+                   <p className="text-[10px] text-navy-500 text-center italic">Upgrade to Pro for unlimited journaling.</p>
+                </div>
+              )}
+           </div>
+        </div>
+      </div>
     </div>
   );
 }

@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import {
-  User,
+  User as UserIcon,
   Bell,
   Shield,
   Save,
@@ -10,10 +10,14 @@ import {
   Check,
   Sparkles,
   Loader2,
+  ChevronRight,
+  Mail,
+  Clock,
+  ShieldCheck,
+  CreditCard
 } from 'lucide-react';
 import UpgradeModal from '../../components/UpgradeModal';
 import { trackEvent } from '../../lib/analytics';
-import { useEffect } from 'react';
 
 export default function Settings() {
   const { user, isPro, subscriptionTier } = useAuth();
@@ -25,6 +29,8 @@ export default function Settings() {
   const [dailyReminderEnabled, setDailyReminderEnabled] = useState(false);
   const [dailyReminderTime, setDailyReminderTime] = useState('08:00');
   const [toastMessage, setToastMessage] = useState('');
+
+  const userInitial = fullName ? fullName.charAt(0).toUpperCase() : (user?.email?.charAt(0).toUpperCase() || '?');
 
   useEffect(() => {
     if (user) {
@@ -97,226 +103,228 @@ export default function Settings() {
     setDailyReminderEnabled(enabled);
   };
 
-  const handleManageSubscription = async () => {
-    // For now, open the upgrade modal. In production, this would redirect
-    // to Stripe Customer Portal for managing existing subscriptions.
-    setCheckoutLoading(true);
-    setShowUpgrade(true);
-    setTimeout(() => setCheckoutLoading(false), 400);
-  };
-
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-3xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-10 max-w-4xl mx-auto space-y-10 animate-slide-up-fade">
       <UpgradeModal open={showUpgrade} onClose={() => setShowUpgrade(false)} />
+      
       {toastMessage && (
-        <div className="fixed top-4 right-4 z-50 bg-emerald-400/15 border border-emerald-400/30 text-emerald-300 px-4 py-2 rounded-xl text-sm shadow-lg">
+        <div className="fixed top-8 right-8 z-[100] bg-emerald-400 text-navy-950 px-6 py-3 rounded-2xl font-bold shadow-2xl animate-slide-up-fade">
           {toastMessage}
         </div>
       )}
 
-      <div className="mb-8">
-        <h1 className="text-2xl sm:text-3xl font-bold text-white">Settings</h1>
-        <p className="mt-1 text-sm text-navy-300">Manage your account and preferences</p>
-      </div>
-
-      <div className="space-y-6">
-        {/* Subscription */}
-        <div className="bg-navy-900/50 border border-navy-800 rounded-2xl p-6">
-          <div className="flex items-center gap-2 mb-5">
-            <Crown className="w-5 h-5 text-gold-400" />
-            <h2 className="text-base font-semibold text-white">Subscription</h2>
+      {/* Header & Profile Summary */}
+      <div className="flex flex-col sm:flex-row items-center gap-8 bg-navy-900/40 border border-white/5 rounded-[2.5rem] p-8 sm:p-10 relative overflow-hidden group">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-gold-400/5 rounded-full blur-[80px] -translate-y-1/2 translate-x-1/2 pointer-events-none group-hover:bg-gold-400/10 transition-all duration-700" />
+        
+        <div className="relative">
+          <div className="w-24 h-24 bg-gold-gradient rounded-[2rem] flex items-center justify-center text-3xl font-black text-navy-950 shadow-2xl shadow-gold-400/20 group-hover:scale-105 transition-transform duration-500">
+            {userInitial}
           </div>
-
-          {isPro ? (
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="inline-flex items-center gap-1 text-sm font-bold text-gold-400 bg-gold-400/10 px-2.5 py-1 rounded-lg">
-                    <Crown className="w-3.5 h-3.5" />
-                    PRO
-                  </span>
-                </div>
-                <p className="text-sm text-navy-300">
-                  You have access to all Pro features including unlimited AI chat, unlimited prayers, and analytics.
-                </p>
-              </div>
-              <button
-                onClick={handleManageSubscription}
-                disabled={checkoutLoading}
-                className="text-sm text-navy-300 hover:text-white border border-navy-700 px-4 py-2 rounded-xl transition-colors disabled:opacity-60"
-              >
-                {checkoutLoading ? (
-                  <span className="inline-flex items-center gap-2">
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Opening...
-                  </span>
-                ) : (
-                  'Manage'
-                )}
-              </button>
-            </div>
-          ) : (
-            <div>
-              <div className="flex items-center gap-2 mb-3">
-                <span className="text-sm font-medium text-navy-300 bg-navy-800 px-2.5 py-1 rounded-lg">
-                  Free Plan
-                </span>
-              </div>
-
-              {/* Plan comparison */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
-                <div className="bg-navy-800/50 border border-navy-700 rounded-xl p-4">
-                  <p className="text-sm font-semibold text-white mb-3">Free</p>
-                  <ul className="space-y-2">
-                    {[
-                      '5 AI messages/day',
-                      'Up to 10 prayers',
-                      'Daily verse & devotional',
-                    ].map((f) => (
-                      <li key={f} className="flex items-start gap-2 text-xs text-navy-300">
-                        <span className="w-1 h-1 bg-navy-500 rounded-full mt-1.5 flex-shrink-0" />
-                        {f}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-                <div className="bg-gold-400/5 border border-gold-400/20 rounded-xl p-4 relative">
-                  <div className="absolute -top-2 right-3 bg-gold-400 text-navy-950 text-[9px] font-bold px-2 py-0.5 rounded-md">
-                    RECOMMENDED
-                  </div>
-                  <p className="text-sm font-semibold text-gold-400 mb-3">Pro</p>
-                  <ul className="space-y-2">
-                    {[
-                      'Unlimited AI chat',
-                      'Unlimited prayer journal',
-                      'Prayer analytics',
-                      'Priority responses',
-                    ].map((f) => (
-                      <li key={f} className="flex items-start gap-2 text-xs text-navy-200">
-                        <Check className="w-3 h-3 text-emerald-400 flex-shrink-0 mt-0.5" />
-                        {f}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3 mb-4">
-                <div className="flex-1 bg-navy-800/50 border border-navy-700 rounded-xl p-3 text-center">
-                  <p className="text-lg font-bold text-white">$4.99</p>
-                  <p className="text-xs text-navy-400">/month</p>
-                </div>
-                <div className="flex-1 bg-gold-400/5 border border-gold-400/20 rounded-xl p-3 text-center relative">
-                  <span className="absolute -top-2 right-2 bg-emerald-400 text-navy-950 text-[8px] font-bold px-1.5 py-0.5 rounded">
-                    SAVE 33%
-                  </span>
-                  <p className="text-lg font-bold text-white">$39.99</p>
-                  <p className="text-xs text-navy-400">/year</p>
-                </div>
-              </div>
-
-              <button
-                onClick={() => {
-                  trackEvent('upgrade_button_clicked', { source: 'settings_page' });
-                  setShowUpgrade(true);
-                }}
-                className="w-full flex items-center justify-center gap-2 bg-gold-400 text-navy-950 font-semibold py-3 rounded-xl hover:bg-gold-300 transition-colors shadow-lg shadow-gold-400/20"
-              >
-                <Sparkles className="w-4 h-4" />
-                Upgrade to Pro
-              </button>
+          {isPro && (
+            <div className="absolute -bottom-2 -right-2 w-10 h-10 bg-navy-950 border-4 border-navy-900 rounded-full flex items-center justify-center text-gold-400 shadow-xl">
+              <Crown className="w-5 h-5 fill-gold-400" />
             </div>
           )}
         </div>
 
-        {/* Profile */}
-        <div className="bg-navy-900/50 border border-navy-800 rounded-2xl p-6">
-          <div className="flex items-center gap-2 mb-5">
-            <User className="w-5 h-5 text-gold-400" />
-            <h2 className="text-base font-semibold text-white">Profile</h2>
-          </div>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-navy-200 mb-1.5">Email</label>
-              <input
-                type="email"
-                value={user?.email || ''}
-                disabled
-                className="w-full bg-navy-800 border border-navy-700 rounded-xl px-4 py-3 text-sm text-navy-400 cursor-not-allowed"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-navy-200 mb-1.5">Full Name</label>
-              <input
-                type="text"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                className="w-full bg-navy-800 border border-navy-700 rounded-xl px-4 py-3 text-sm text-white placeholder-navy-400 focus:outline-none focus:border-gold-400/50 focus:ring-1 focus:ring-gold-400/50 transition-colors"
-              />
-            </div>
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="flex items-center gap-2 bg-gold-400 text-navy-950 font-semibold px-6 py-2.5 rounded-xl hover:bg-gold-300 transition-colors text-sm disabled:opacity-40"
-            >
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-              {saving ? 'Saving...' : saved ? 'Saved!' : 'Save Changes'}
-            </button>
+        <div className="flex-1 text-center sm:text-left space-y-2">
+          <h1 className="text-3xl font-black text-white tracking-tight">{fullName || 'Spiritual Journeyer'}</h1>
+          <div className="flex flex-wrap items-center justify-center sm:justify-start gap-4">
+             <div className="flex items-center gap-2 text-sm text-navy-400 font-medium bg-navy-950/50 px-3 py-1.5 rounded-xl border border-white/5">
+                <Mail className="w-4 h-4 text-gold-400" />
+                {user?.email}
+             </div>
+             <div className={`flex items-center gap-2 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-xl border ${
+               isPro ? 'bg-gold-400/10 text-gold-400 border-gold-400/20' : 'bg-navy-800 text-navy-500 border-navy-700'
+             }`}>
+                {isPro ? 'Pro Member' : 'Free Plan'}
+             </div>
           </div>
         </div>
+      </div>
 
-        {/* Notifications */}
-        <div className="bg-navy-900/50 border border-navy-800 rounded-2xl p-6">
-          <div className="flex items-center gap-2 mb-5">
-            <Bell className="w-5 h-5 text-gold-400" />
-            <h2 className="text-base font-semibold text-white">Notifications</h2>
-          </div>
-          <div className="space-y-4">
-            <label className="flex items-center justify-between cursor-pointer">
-              <div>
-                <p className="text-sm text-white">Daily Prayer Reminder</p>
-                <p className="text-xs text-navy-400">Receive a daily reminder at your chosen time</p>
+      <div className="grid lg:grid-cols-12 gap-8">
+        
+        {/* Left Column: Plan & Security */}
+        <div className="lg:col-span-7 space-y-8">
+          
+          {/* Subscription Section */}
+          <div className="bg-navy-900/40 border border-white/5 rounded-[2rem] p-8 space-y-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                 <div className="w-10 h-10 bg-gold-400/10 rounded-xl flex items-center justify-center">
+                    <Crown className="w-5 h-5 text-gold-400" />
+                 </div>
+                 <h2 className="text-lg font-bold text-white">Your Plan</h2>
               </div>
-              <div className="relative">
-                <input
-                  type="checkbox"
-                  className="sr-only peer"
-                  checked={dailyReminderEnabled}
-                  onChange={(e) => {
-                    void handleReminderToggle(e.target.checked);
-                  }}
-                />
-                <div className="w-11 h-6 bg-navy-700 rounded-full peer-checked:bg-gold-400 transition-colors" />
-                <div className="absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full transition-transform peer-checked:translate-x-5" />
+              <button 
+                onClick={() => setShowUpgrade(true)}
+                className="text-xs font-bold text-gold-400 hover:text-white transition-colors flex items-center gap-1.5 group"
+              >
+                {isPro ? 'Manage Details' : 'Upgrade Options'}
+                <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+              </button>
+            </div>
+
+            {isPro ? (
+              <div className="relative bg-navy-950/50 border border-gold-400/20 rounded-[1.5rem] p-6 group">
+                <div className="absolute top-0 right-0 p-4">
+                   <Sparkles className="w-5 h-5 text-gold-400/30 animate-pulse" />
+                </div>
+                <p className="text-sm text-navy-300 leading-relaxed">
+                   You are currently on <span className="text-gold-400 font-bold uppercase tracking-widest text-[11px]">{subscriptionTier?.replace('_', ' ')}</span>.
+                   Enjoy unlimited AI chat, prayer history, and deep spiritual analytics.
+                </p>
+                <div className="mt-6 flex items-center gap-4 text-xs font-black text-emerald-400 uppercase tracking-[0.2em]">
+                   <Check className="w-4 h-4" />
+                   Status: Active & Protected
+                </div>
               </div>
-            </label>
-            {dailyReminderEnabled && (
-              <div>
-                <label className="block text-sm font-medium text-navy-200 mb-1.5">Reminder Time</label>
-                <input
-                  type="time"
-                  value={dailyReminderTime}
-                  onChange={(e) => setDailyReminderTime(e.target.value)}
-                  className="w-full sm:w-56 bg-navy-800 border border-navy-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-gold-400/50 focus:ring-1 focus:ring-gold-400/50 transition-colors"
-                />
+            ) : (
+              <div className="space-y-6">
+                <div className="bg-gold-gradient rounded-[1.5rem] p-8 text-navy-950 shadow-2xl shadow-gold-400/10">
+                   <h3 className="text-2xl font-black mb-2 flex items-center gap-2">
+                     BibleAI Pro
+                     <Sparkles className="w-6 h-6" />
+                   </h3>
+                   <p className="text-navy-950/80 font-bold text-sm mb-6">Unlock the full spiritual dimension of BibleAI.</p>
+                   <ul className="space-y-3 mb-8">
+                      {['Unlimited AI Biblical Insights', 'Infinite Prayer Journal History', 'Prayer Analytics & Trends', 'Early Access to New Features'].map(item => (
+                        <li key={item} className="flex items-center gap-2 text-xs font-black uppercase tracking-widest">
+                           <Check className="w-4 h-4" />
+                           {item}
+                        </li>
+                      ))}
+                   </ul>
+                   <button 
+                     onClick={() => setShowUpgrade(true)}
+                     className="w-full bg-navy-950 text-white font-black py-4 rounded-2xl hover:bg-navy-900 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-2xl"
+                   >
+                     Get Started &bull; $4.99/mo
+                   </button>
+                </div>
               </div>
             )}
           </div>
-        </div>
 
-        {/* Security */}
-        <div className="bg-navy-900/50 border border-navy-800 rounded-2xl p-6">
-          <div className="flex items-center gap-2 mb-5">
-            <Shield className="w-5 h-5 text-gold-400" />
-            <h2 className="text-base font-semibold text-white">Security</h2>
-          </div>
-          <div>
-            <p className="text-sm text-navy-300 mb-3">Your data is protected with Supabase Row Level Security. Only you can access your prayers, reflections, and chat history.</p>
-            <div className="flex items-center gap-2 text-xs text-emerald-400 bg-emerald-400/10 border border-emerald-400/20 rounded-lg px-3 py-2 w-fit">
-              <Shield className="w-3.5 h-3.5" />
-              RLS Enabled
+          {/* Security & Data */}
+          <div className="bg-navy-900/40 border border-white/5 rounded-[2rem] p-8 space-y-6">
+            <div className="flex items-center gap-3">
+               <div className="w-10 h-10 bg-purple-400/10 rounded-xl flex items-center justify-center">
+                  <ShieldCheck className="w-5 h-5 text-purple-400" />
+               </div>
+               <h2 className="text-lg font-bold text-white">Security & Data</h2>
+            </div>
+            <p className="text-sm text-navy-400 leading-relaxed">
+              Your spiritual journey is deeply personal. BibleAI uses enterprise-grade encryption and 
+              Row Level Security (RLS) to ensure that only you can ever access your prayers and reflections.
+            </p>
+            <div className="flex items-center justify-between p-4 bg-navy-950/50 border border-white/5 rounded-2xl">
+               <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-emerald-400/10 rounded-lg flex items-center justify-center">
+                     <Check className="w-4 h-4 text-emerald-400" />
+                  </div>
+                  <span className="text-xs font-bold text-white uppercase tracking-widest">Database Privacy</span>
+               </div>
+               <span className="text-[10px] font-black text-navy-500 uppercase tracking-widest">Active</span>
             </div>
           </div>
+        </div>
+
+        {/* Right Column: Preferences */}
+        <div className="lg:col-span-5 space-y-8">
+          
+          {/* Profile Edit Section */}
+          <div className="bg-navy-900/40 border border-white/5 rounded-[2rem] p-8 space-y-6">
+            <div className="flex items-center gap-3">
+               <div className="w-10 h-10 bg-blue-400/10 rounded-xl flex items-center justify-center">
+                  <UserIcon className="w-5 h-5 text-blue-400" />
+               </div>
+               <h2 className="text-lg font-bold text-white">Profile Details</h2>
+            </div>
+            
+            <div className="space-y-5">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-navy-500 uppercase tracking-[0.2em] ml-2">Full Name</label>
+                <input
+                  type="text"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="Your Name"
+                  className="w-full bg-navy-950/50 border border-white/5 rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:border-gold-400/30 focus:ring-4 focus:ring-gold-400/5 transition-all"
+                />
+              </div>
+              
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-navy-500 uppercase tracking-[0.2em] ml-2">Registered Email</label>
+                <div className="relative group">
+                  <input
+                    type="email"
+                    value={user?.email || ''}
+                    disabled
+                    className="w-full bg-navy-950/30 border border-white/5 rounded-2xl px-5 py-4 text-sm text-navy-500 cursor-not-allowed italic"
+                  />
+                  <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                    <Shield className="w-4 h-4 text-navy-700" />
+                  </div>
+                </div>
+              </div>
+
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="w-full flex items-center justify-center gap-3 bg-white/5 border border-white/10 text-white font-bold py-4 rounded-2xl hover:bg-white/10 transition-all active:scale-[0.98] disabled:opacity-40"
+              >
+                {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+                {saving ? 'Synchronizing...' : saved ? 'Successfully Saved' : 'Update Profile'}
+              </button>
+            </div>
+          </div>
+
+          {/* Notifications Section */}
+          <div className="bg-navy-900/40 border border-white/5 rounded-[2rem] p-8 space-y-6">
+            <div className="flex items-center gap-3">
+               <div className="w-10 h-10 bg-amber-400/10 rounded-xl flex items-center justify-center">
+                  <Bell className="w-5 h-5 text-amber-400" />
+               </div>
+               <h2 className="text-lg font-bold text-white">Notifications</h2>
+            </div>
+
+            <div className="space-y-6">
+               <div className="flex items-center justify-between p-2">
+                  <div className="space-y-1">
+                     <p className="text-sm font-bold text-white">Daily Prayer Reminder</p>
+                     <p className="text-[10px] text-navy-500 font-medium uppercase tracking-widest">Built-in accountability</p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="sr-only peer"
+                      checked={dailyReminderEnabled}
+                      onChange={(e) => void handleReminderToggle(e.target.checked)}
+                    />
+                    <div className="w-12 h-6 bg-navy-800 rounded-full peer peer-checked:after:translate-x-6 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gold-400 shadow-inner" />
+                  </label>
+               </div>
+
+               {dailyReminderEnabled && (
+                 <div className="space-y-2 animate-slide-up-fade">
+                    <label className="text-[10px] font-black text-navy-500 uppercase tracking-[0.2em] ml-2 flex items-center gap-2">
+                       <Clock className="w-3 h-3" />
+                       Preferred Time
+                    </label>
+                    <input
+                      type="time"
+                      value={dailyReminderTime}
+                      onChange={(e) => setDailyReminderTime(e.target.value)}
+                      className="w-full bg-navy-950/50 border border-white/5 rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:border-gold-400/30 transition-all"
+                    />
+                 </div>
+               )}
+            </div>
+          </div>
+
         </div>
       </div>
     </div>
