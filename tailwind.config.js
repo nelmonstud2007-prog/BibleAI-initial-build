@@ -33,6 +33,18 @@ export default {
       fontFamily: {
         sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
       },
+      backgroundImage: {
+        'gold-gradient': 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #d97706 100%)',
+      },
+      keyframes: {
+        'scroll-demo': {
+          '0%': { transform: 'translateY(0)' },
+          '100%': { transform: 'translateY(-50%)' },
+        },
+      },
+      animation: {
+        'scroll-demo': 'scroll-demo 20s linear infinite',
+      },
     },
   },
   plugins: [],

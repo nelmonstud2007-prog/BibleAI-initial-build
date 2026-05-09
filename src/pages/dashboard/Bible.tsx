@@ -624,10 +624,10 @@ export default function Bible() {
               onChange={(e) => setPlaybackSpeed(parseFloat(e.target.value))}
               className="bg-transparent text-[10px] font-bold text-navy-300 focus:outline-none cursor-pointer pr-2"
             >
-              <option value="0.75" className="bg-navy-900">0.75x</option>
-              <option value="1" className="bg-navy-900">1.0x</option>
-              <option value="1.25" className="bg-navy-900">1.25x</option>
-              <option value="1.5" className="bg-navy-900">1.5x</option>
+              <option value="0.75" className="bg-navy-900 text-white">0.75x</option>
+              <option value="1" className="bg-navy-900 text-white">1.0x</option>
+              <option value="1.25" className="bg-navy-900 text-white">1.25x</option>
+              <option value="1.5" className="bg-navy-900 text-white">1.5x</option>
             </select>
           </div>
         </div>

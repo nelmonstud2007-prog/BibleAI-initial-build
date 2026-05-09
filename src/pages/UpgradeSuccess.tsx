@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { CheckCircle, Crown, Loader2, Sparkles } from 'lucide-react';
+import { CheckCircle, Crown, Loader2, Sparkles, PartyPopper } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import type { SubscriptionTier } from '../context/AuthContext';
 
@@ -30,9 +30,16 @@ export default function UpgradeSuccess() {
   const [polling, setPolling] = useState(true);
   const [polls, setPolls] = useState(0);
   const tierRef = useRef(subscriptionTier);
+  const [showCelebration, setShowCelebration] = useState(false);
 
   // Keep the ref in sync so the interval callback reads the latest value
   tierRef.current = subscriptionTier;
+
+  // Trigger celebration animation after mount
+  useEffect(() => {
+    const timer = setTimeout(() => setShowCelebration(true), 200);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -79,25 +86,29 @@ export default function UpgradeSuccess() {
   }, [subscriptionTier, expectedTier, confirmed]);
 
   return (
-    <div className="min-h-screen bg-navy-950 flex items-center justify-center px-4">
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] bg-gold-400/5 rounded-full blur-3xl pointer-events-none" />
+    <div className="min-h-screen bg-navy-950 flex items-center justify-center px-4 relative overflow-hidden">
+      {/* Decorative background elements */}
+      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-gold-400/5 rounded-full blur-3xl pointer-events-none animate-float" />
+      <div className="absolute bottom-1/4 right-1/4 w-72 h-72 bg-gold-400/5 rounded-full blur-3xl pointer-events-none animate-float" style={{ animationDelay: '3s' }} />
 
-      <div className="max-w-md w-full text-center relative">
-        <div className="w-24 h-24 bg-gold-400/10 rounded-3xl flex items-center justify-center mx-auto mb-8 border border-gold-400/20 shadow-2xl shadow-gold-400/10 animate-fade-in-up">
+      <div className="max-w-md w-full text-center relative z-10">
+        {/* Icon */}
+        <div className={`w-24 h-24 bg-gold-400/10 rounded-3xl flex items-center justify-center mx-auto mb-8 border border-gold-400/20 shadow-2xl shadow-gold-400/10 ${showCelebration ? 'animate-celebration' : 'opacity-0'} animate-glow-pulse`}>
           <Crown className="w-12 h-12 text-gold-400" />
         </div>
 
-        <h1 className="text-3xl font-bold text-white mb-3 animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
-          Welcome to Pro!
+        {/* Heading */}
+        <h1 className="text-3xl font-bold text-white mb-3 animate-slide-up-fade" style={{ animationDelay: '0.2s' }}>
+          Welcome to Pro! 🎉
         </h1>
-        <p className="text-navy-300 mb-8 animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
+        <p className="text-navy-300 mb-8 animate-slide-up-fade" style={{ animationDelay: '0.3s' }}>
           Your <span className="text-gold-400 font-semibold">{planLabel}</span> subscription
           is now active. Enjoy unlimited access to all BibleAI features.
         </p>
 
         <div
-          className="bg-navy-900/80 border border-navy-800 rounded-2xl p-5 mb-8 animate-fade-in-up"
-          style={{ animationDelay: '0.3s' }}
+          className="bg-navy-900/80 border border-navy-800 rounded-2xl p-5 mb-8 animate-slide-up-fade backdrop-blur-sm"
+          style={{ animationDelay: '0.4s' }}
         >
           {confirmed ? (
             <div className="flex items-center justify-center gap-3 text-emerald-400">
@@ -123,15 +134,20 @@ export default function UpgradeSuccess() {
           )}
         </div>
 
-        <ul className="text-left space-y-3 mb-8 animate-fade-in-up" style={{ animationDelay: '0.4s' }}>
+        {/* What's unlocked */}
+        <ul className="text-left space-y-3 mb-8 animate-slide-up-fade" style={{ animationDelay: '0.5s' }}>
           {[
             'Unlimited AI Bible Chat messages',
             'Unlimited prayer journal entries',
             'Prayer analytics & insights',
             'Priority AI responses',
             'Daily devotional archive',
-          ].map((feature) => (
-            <li key={feature} className="flex items-center gap-3 text-sm text-navy-200">
+          ].map((feature, i) => (
+            <li
+              key={feature}
+              className="flex items-center gap-3 text-sm text-navy-200 animate-stagger-in"
+              style={{ animationDelay: `${0.6 + i * 0.1}s` }}
+            >
               <CheckCircle className="w-4 h-4 text-emerald-400 flex-shrink-0" />
               {feature}
             </li>
@@ -140,8 +156,8 @@ export default function UpgradeSuccess() {
 
         <button
           onClick={() => navigate('/dashboard')}
-          className="w-full bg-gold-400 text-navy-950 font-semibold py-3.5 rounded-xl hover:bg-gold-300 transition-colors shadow-lg shadow-gold-400/20 flex items-center justify-center gap-2 animate-fade-in-up"
-          style={{ animationDelay: '0.5s' }}
+          className="w-full bg-gold-400 text-navy-950 font-semibold py-3.5 rounded-xl hover:bg-gold-300 transition-all shadow-lg shadow-gold-400/20 flex items-center justify-center gap-2 animate-slide-up-fade hover:-translate-y-0.5 active:scale-[0.98]"
+          style={{ animationDelay: '0.7s' }}
         >
           <Sparkles className="w-5 h-5" />
           Go to Dashboard

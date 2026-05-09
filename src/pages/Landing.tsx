@@ -268,7 +268,7 @@ export default function Landing() {
             {!isLoggedIn && (
               <Link to="/signin" className="text-sm text-navy-300 hover:text-white transition-colors">Sign In</Link>
             )}
-            <Link to={ctaLink} className="bg-gold-gradient text-navy-950 text-xs font-bold px-5 py-2.5 rounded-full hover:scale-105 transition-transform">
+            <Link to={ctaLink} className="bg-gold-gradient text-navy-950 text-xs font-bold px-5 py-2.5 rounded-full hover:scale-105 transition-transform shadow-lg shadow-gold-400/20">
               {navCtaText}
             </Link>
           </div>
@@ -293,7 +293,7 @@ export default function Landing() {
             {!isLoggedIn && (
               <Link to="/signin" className="text-sm text-navy-300 hover:text-white transition-colors px-4 py-2">Sign In</Link>
             )}
-            <Link to={ctaLink} className="text-sm font-medium bg-gold-400 text-navy-950 px-5 py-2 rounded-lg hover:bg-gold-300 transition-colors">
+            <Link to={ctaLink} className="text-sm font-medium bg-gold-400 text-navy-950 px-5 py-2 rounded-lg hover:bg-gold-300 transition-colors shadow-lg shadow-gold-400/20">
               {navCtaText}
             </Link>
           </div>
@@ -642,7 +642,7 @@ export default function Landing() {
       {!demoOpen && (
         <button
           onClick={() => setDemoOpen(true)}
-          className="fixed bottom-6 right-6 z-50 bg-gold-400 text-navy-950 font-bold px-6 py-3 rounded-full shadow-2xl hover:bg-gold-300 transition-all hover:-translate-y-1 flex items-center gap-2 group"
+          className="fixed bottom-6 right-6 z-50 bg-gold-400 text-navy-950 font-bold px-6 py-3 rounded-full shadow-2xl hover:bg-gold-300 transition-all hover:-translate-y-1 flex items-center gap-2 group animate-glow-pulse"
         >
           <MessageCircle className="w-5 h-5 group-hover:scale-110 transition-transform" />
           Try Bible AI
