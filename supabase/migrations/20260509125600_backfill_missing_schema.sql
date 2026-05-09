@@ -312,6 +312,16 @@ BEGIN
 
   IF NOT EXISTS (
     SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'prayer_streaks' AND policyname = 'Users can update own streaks'
+  ) THEN
+    CREATE POLICY "Users can update own streaks"
+      ON public.prayer_streaks FOR UPDATE TO authenticated
+      USING (auth.uid() = user_id)
+      WITH CHECK (auth.uid() = user_id);
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
     WHERE schemaname = 'public' AND tablename = 'prayer_streaks' AND policyname = 'Users can delete own streaks'
   ) THEN
     CREATE POLICY "Users can delete own streaks"

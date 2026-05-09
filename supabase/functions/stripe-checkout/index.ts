@@ -21,6 +21,7 @@ Deno.serve(async (req: Request) => {
   try {
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
     if (!stripeKey) {
+      console.error("Missing STRIPE_SECRET_KEY");
       return new Response(
         JSON.stringify({ error: "Stripe not configured" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -35,6 +36,7 @@ Deno.serve(async (req: Request) => {
 
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
+      console.error("Missing Authorization header");
       return new Response(JSON.stringify({ error: "Missing authorization" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -44,6 +46,7 @@ Deno.serve(async (req: Request) => {
     const token = authHeader.replace("Bearer ", "");
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     if (authError || !user) {
+      console.error("Invalid token or user not found:", authError);
       return new Response(JSON.stringify({ error: "Invalid token" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -51,56 +54,77 @@ Deno.serve(async (req: Request) => {
     }
 
     const body = await req.json();
+    console.log("Request body:", body);
+    
     const plan = body.plan || "monthly"; // "monthly" or "yearly"
     const priceId = PRICE_IDS[plan];
+    
     if (!priceId) {
-      return new Response(JSON.stringify({ error: "Invalid plan" }), {
+      console.error(`Invalid plan or missing price ID for: ${plan}. Price IDs:`, PRICE_IDS);
+      return new Response(JSON.stringify({ error: "Invalid plan or price configuration" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     // Get or create Stripe customer
-    const { data: profile } = await supabase
+    const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("stripe_customer_id, email")
       .eq("id", user.id)
       .maybeSingle();
 
+    if (profileError) {
+      console.error("Error fetching user profile:", profileError);
+    }
+
     let customerId = profile?.stripe_customer_id;
 
     if (!customerId) {
+      console.log(`Creating new Stripe customer for user: ${user.id}`);
       const customer = await stripe.customers.create({
         email: user.email!,
         metadata: { supabase_user_id: user.id },
       });
       customerId = customer.id;
 
-      await supabase
+      const { error: updateError } = await supabase
         .from("profiles")
         .update({ stripe_customer_id: customerId })
         .eq("id", user.id);
+        
+      if (updateError) {
+        console.error("Error updating profile with stripe_customer_id:", updateError);
+      }
     }
 
-    const origin = req.headers.get("origin") || "http://localhost:5173";
+    console.log(`Using customerId: ${customerId} for plan: ${plan}`);
+
+    const siteUrl = Deno.env.get("PUBLIC_SITE_URL") || req.headers.get("origin") || "http://localhost:5173";
+    console.log(`Using siteUrl for redirects: ${siteUrl}`);
 
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       mode: "subscription",
       line_items: [{ price: priceId, quantity: 1 }],
-      success_url: `${origin}/dashboard?upgraded=true`,
-      cancel_url: `${origin}/dashboard/settings?canceled=true`,
+      success_url: `${siteUrl}/dashboard?upgraded=true`,
+      cancel_url: `${siteUrl}/dashboard/settings?canceled=true`,
       metadata: { supabase_user_id: user.id, plan },
     });
+
+    console.log("Checkout session created successfully:", session.id);
 
     return new Response(JSON.stringify({ url: session.url }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
-    console.error("Checkout error:", error);
+    console.error("Unexpected checkout error details:", error);
     return new Response(
-      JSON.stringify({ error: "Failed to create checkout session" }),
+      JSON.stringify({ 
+        error: "Failed to create checkout session", 
+        details: error instanceof Error ? error.message : "Unknown error" 
+      }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

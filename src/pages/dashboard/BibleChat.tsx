@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import {
@@ -31,6 +31,53 @@ interface Conversation {
 
 const SYSTEM_PROMPT =
   'You are a knowledgeable and compassionate Bible scholar. Answer all questions using scripture references. Always cite specific Bible verses (book, chapter, verse). Be warm, encouraging, and faith-centered.';
+
+const formatMessageContent = (content: string) => {
+  const verseRegex = /([1-3]\s+)?[A-Z][a-z]+\s+\d+:\d+(-\d+)?/g;
+  const result: (string | JSX.Element)[] = [];
+  let lastIndex = 0;
+  let match;
+
+  while ((match = verseRegex.exec(content)) !== null) {
+    result.push(content.substring(lastIndex, match.index));
+    result.push(
+      <span
+        key={match.index}
+        className="inline-block px-2 py-0.5 rounded-md bg-gold-400/10 text-gold-400 font-medium border border-gold-400/20 mx-1 text-[11px] align-middle shadow-sm"
+      >
+        {match[0]}
+      </span>
+    );
+    lastIndex = verseRegex.lastIndex;
+  }
+  result.push(content.substring(lastIndex));
+  return result;
+};
+
+const TypewriterMessage = ({ content, onComplete }: { content: string; onComplete?: () => void }) => {
+  const words = useMemo(() => content.split(' '), [content]);
+  const [index, setIndex] = useState(0);
+
+  useEffect(() => {
+    if (index < words.length) {
+      const timer = setTimeout(() => {
+        setIndex((prev) => prev + 1);
+      }, 40);
+      return () => clearTimeout(timer);
+    } else if (onComplete) {
+      onComplete();
+    }
+  }, [index, words, onComplete]);
+
+  return (
+    <div className="whitespace-pre-wrap break-words animate-fade-in-up">
+      {formatMessageContent(words.slice(0, index).join(' '))}
+      {index < words.length && (
+        <span className="inline-block w-1.5 h-4 bg-gold-400/50 ml-1 animate-pulse align-middle" />
+      )}
+    </div>
+  );
+};
 
 export default function BibleChat() {
   const { user } = useAuth();
@@ -406,32 +453,32 @@ export default function BibleChat() {
       {/* Main chat area */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Chat header */}
-        <div className="flex items-center gap-3 px-4 sm:px-6 py-3 border-b border-navy-800 bg-navy-950/80 backdrop-blur-sm">
+        <div className="flex items-center gap-3 px-4 sm:px-6 py-4 border-b border-gold-400/20 bg-navy-950/80 backdrop-blur-md relative z-20">
           <button
             onClick={() => setSidebarOpen(true)}
-            className="lg:hidden text-navy-300 hover:text-white p-1"
+            className="lg:hidden text-navy-300 hover:text-white p-1 transition-colors"
           >
             <ChevronLeft className="w-5 h-5" />
           </button>
-          <div className="w-8 h-8 bg-gold-400/10 rounded-lg flex items-center justify-center">
-            <Cross className="w-4 h-4 text-gold-400" />
+          <div className="w-10 h-10 bg-gold-400/10 rounded-xl flex items-center justify-center border border-gold-400/20 shadow-lg shadow-gold-400/5">
+            <Cross className="w-5 h-5 text-gold-400" />
           </div>
           <div className="flex-1 min-w-0">
-            <h1 className="text-sm font-semibold text-white truncate">
+            <h1 className="text-base font-bold text-white truncate">
               {activeConversation?.title || 'Bible Chat'}
             </h1>
-            <p className="text-xs text-navy-400 flex items-center gap-1.5">
+            <p className="text-[11px] text-navy-400 flex items-center gap-1.5 uppercase tracking-wider font-medium">
               {isTyping && <Loader2 className="w-3 h-3 animate-spin text-gold-400" />}
-              {isTyping ? 'BibleAI is preparing a response...' : 'AI-powered Bible scholar'}
+              {isTyping ? 'BibleAI is preparing a response...' : 'Pro Bible Scholar'}
             </p>
           </div>
           {/* Mobile usage badge */}
           {usage.tier === 'free' && usage.limit !== null && (
             <div
-              className={`sm:hidden px-2 py-1 rounded-md text-[10px] font-bold ${
+              className={`sm:hidden px-2.5 py-1 rounded-full text-[10px] font-bold border ${
                 usage.used >= usage.limit
-                  ? 'bg-red-400/10 text-red-400'
-                  : 'bg-navy-800 text-navy-300'
+                  ? 'bg-red-400/10 text-red-400 border-red-400/20'
+                  : 'bg-navy-800 text-navy-300 border-navy-700'
               }`}
             >
               {usage.used}/{usage.limit}
@@ -442,16 +489,16 @@ export default function BibleChat() {
         {/* Messages area */}
         <div className="flex-1 overflow-y-auto pb-36 lg:pb-0">
           {messages.length === 0 && !loadingMessages ? (
-            <div className="flex flex-col items-center justify-center h-full px-4 py-12">
-              <div className="w-16 h-16 bg-gold-400/10 rounded-2xl flex items-center justify-center mb-6">
-                <Cross className="w-8 h-8 text-gold-400" />
+            <div className="flex flex-col items-center justify-center h-full px-4 py-12 animate-fade-in-up">
+              <div className="w-20 h-20 bg-gold-400/10 rounded-3xl flex items-center justify-center mb-6 border border-gold-400/20 shadow-2xl shadow-gold-400/5">
+                <Cross className="w-10 h-10 text-gold-400" />
               </div>
-              <h2 className="text-xl font-bold text-white mb-2">Bible Chat</h2>
-              <p className="text-sm text-navy-300 text-center max-w-md mb-8">
+              <h2 className="text-2xl font-bold text-white mb-3">Faith Journey Begins</h2>
+              <p className="text-sm text-navy-300 text-center max-w-md mb-10 leading-relaxed">
                 Ask anything about scripture, theology, prayer, or how to apply God&apos;s Word to
-                your life.
+                your life today.
               </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-lg">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-xl">
                 {[
                   'What does the Bible say about anxiety?',
                   'How do I forgive someone?',
@@ -464,7 +511,7 @@ export default function BibleChat() {
                       setInput(suggestion);
                       inputRef.current?.focus();
                     }}
-                    className="text-left bg-navy-900/50 border border-navy-800 rounded-xl px-4 py-3 text-sm text-navy-200 hover:text-white hover:border-navy-700 transition-all"
+                    className="text-left bg-navy-900/40 border border-navy-800 rounded-2xl px-5 py-4 text-sm text-navy-200 hover:text-white hover:border-gold-400/30 hover:bg-navy-900/60 hover:-translate-y-1 transition-all duration-300 shadow-lg shadow-black/20"
                   >
                     {suggestion}
                   </button>
@@ -472,54 +519,54 @@ export default function BibleChat() {
               </div>
             </div>
           ) : (
-            <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 pb-20 lg:pb-6 space-y-6">
-              {messages.map((message) => (
+            <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8 pb-24 lg:pb-8 space-y-8">
+              {messages.map((message, idx) => (
                 <div
                   key={message.id}
-                  className={`flex gap-3 ${message.role === 'user' ? 'flex-row-reverse' : ''}`}
+                  className={`flex gap-4 animate-fade-in-up ${message.role === 'user' ? 'flex-row-reverse' : ''}`}
+                  style={{ animationDelay: `${idx * 0.1}s` }}
                 >
                   <div
-                    className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${
-                      message.role === 'assistant' ? 'bg-gold-400/10' : 'bg-navy-700'
+                    className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 border shadow-md ${
+                      message.role === 'assistant' 
+                        ? 'bg-navy-950 border-gold-400/20 shadow-gold-400/5' 
+                        : 'bg-gold-400/10 border-navy-700 shadow-black/20'
                     }`}
                   >
                     {message.role === 'assistant' ? (
-                      <Bot className="w-4 h-4 text-gold-400" />
+                      <Cross className="w-5 h-5 text-gold-400" />
                     ) : (
-                      <User className="w-4 h-4 text-navy-300" />
+                      <User className="w-5 h-5 text-navy-300" />
                     )}
                   </div>
                   <div
-                    className={`max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
+                    className={`relative max-w-[85%] sm:max-w-[80%] rounded-2xl px-5 py-4 text-[15px] leading-relaxed shadow-xl ${
                       message.role === 'assistant'
-                        ? 'bg-navy-900/80 border border-navy-800 text-navy-100'
-                        : 'bg-gold-400/10 border border-gold-400/20 text-white'
+                        ? 'bg-navy-900/90 border border-navy-800 text-navy-100'
+                        : 'bg-gold-gradient border border-gold-500/30 text-navy-950 font-medium'
                     }`}
                   >
-                    <div className="whitespace-pre-wrap break-words">{message.content}</div>
+                    {message.role === 'assistant' && idx === messages.length - 1 && isTyping === false ? (
+                      <TypewriterMessage content={message.content} onComplete={scrollToBottom} />
+                    ) : (
+                      <div className="whitespace-pre-wrap break-words">
+                        {message.role === 'assistant' ? formatMessageContent(message.content) : message.content}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
 
               {isTyping && (
-                <div className="flex gap-3">
-                  <div className="w-8 h-8 bg-gold-400/10 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <Bot className="w-4 h-4 text-gold-400" />
+                <div className="flex gap-4 animate-fade-in-up">
+                  <div className="w-10 h-10 bg-navy-950 border border-gold-400/20 rounded-full flex items-center justify-center flex-shrink-0 shadow-md">
+                    <Cross className="w-5 h-5 text-gold-400" />
                   </div>
-                  <div className="bg-navy-900/80 border border-navy-800 rounded-2xl px-4 py-3">
-                    <div className="flex gap-1.5">
-                      <span
-                        className="w-2 h-2 bg-navy-500 rounded-full animate-bounce"
-                        style={{ animationDelay: '0ms' }}
-                      />
-                      <span
-                        className="w-2 h-2 bg-navy-500 rounded-full animate-bounce"
-                        style={{ animationDelay: '150ms' }}
-                      />
-                      <span
-                        className="w-2 h-2 bg-navy-500 rounded-full animate-bounce"
-                        style={{ animationDelay: '300ms' }}
-                      />
+                  <div className="bg-navy-900/90 border border-navy-800 rounded-2xl px-5 py-4 shadow-xl">
+                    <div className="flex gap-2">
+                      <span className="w-2 h-2 bg-gold-400/60 rounded-full animate-pulse-typing" />
+                      <span className="w-2 h-2 bg-gold-400/60 rounded-full animate-pulse-typing" style={{ animationDelay: '0.2s' }} />
+                      <span className="w-2 h-2 bg-gold-400/60 rounded-full animate-pulse-typing" style={{ animationDelay: '0.4s' }} />
                     </div>
                   </div>
                 </div>
@@ -531,9 +578,9 @@ export default function BibleChat() {
         </div>
 
         {/* Input area */}
-        <div className="fixed lg:static bottom-0 left-0 right-0 z-30 border-t border-navy-800 bg-navy-950 px-4 sm:px-6 py-3 lg:py-4 pb-[calc(env(safe-area-inset-bottom)+12px)] lg:pb-4">
-          <div className="max-w-3xl mx-auto">
-            <div className="flex items-end gap-3 bg-navy-900/50 border border-navy-800 rounded-2xl px-4 py-3 focus-within:border-gold-400/30 transition-colors">
+        <div className="fixed lg:static bottom-0 left-0 right-0 z-30 border-t border-gold-400/10 bg-navy-950/95 backdrop-blur-md px-4 sm:px-6 py-4 lg:py-6 pb-[calc(env(safe-area-inset-bottom)+16px)] lg:pb-8">
+          <div className="max-w-3xl mx-auto relative">
+            <div className="flex items-end gap-3 bg-navy-900 border border-navy-800 rounded-[32px] px-6 py-4 focus-within:border-gold-400/40 focus-within:ring-1 focus-within:ring-gold-400/20 transition-all duration-300 shadow-2xl shadow-black/40">
               <textarea
                 ref={inputRef}
                 value={input}
@@ -542,18 +589,25 @@ export default function BibleChat() {
                 disabled={isTyping}
                 placeholder="Ask about the Bible, prayer, faith..."
                 rows={1}
-                className="flex-1 bg-transparent text-sm text-white placeholder-navy-400 focus:outline-none resize-none max-h-40 leading-relaxed disabled:opacity-60"
+                maxLength={1000}
+                className="flex-1 bg-transparent text-[15px] text-white placeholder-navy-500 focus:outline-none resize-none max-h-40 leading-relaxed disabled:opacity-60 py-1"
               />
-              <button
-                onClick={handleSend}
-                disabled={!input.trim() || isTyping}
-                className="bg-gold-400 text-navy-950 p-2 rounded-lg hover:bg-gold-300 transition-colors disabled:opacity-30 disabled:cursor-not-allowed flex-shrink-0"
-              >
-                {isTyping ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-              </button>
+              <div className="flex flex-col items-center gap-2">
+                <span className={`text-[10px] font-medium transition-colors ${input.length > 900 ? 'text-amber-400' : 'text-navy-600'}`}>
+                  {input.length}/1000
+                </span>
+                <button
+                  onClick={handleSend}
+                  disabled={!input.trim() || isTyping}
+                  className="bg-gold-gradient text-navy-950 p-3 rounded-full hover:scale-105 active:scale-95 transition-all disabled:opacity-20 disabled:grayscale disabled:cursor-not-allowed flex-shrink-0 shadow-lg shadow-gold-400/20"
+                >
+                  {isTyping ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+                </button>
+              </div>
             </div>
-            <p className="text-[10px] text-navy-500 mt-2 text-center">
-              BibleAI provides faith-centered responses. Always verify with your own Bible study.
+            <p className="text-[11px] text-navy-500 mt-3 text-center font-medium">
+              <Sparkles className="w-3 h-3 inline-block mr-1 text-gold-400/60" />
+              BibleAI provides faith-centered guidance. Verify with your personal study.
             </p>
           </div>
         </div>

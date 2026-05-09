@@ -168,11 +168,21 @@ export default function PrayerJournal() {
     if (!user) return;
     const today = new Date().toISOString().split('T')[0];
 
-    const { error: streakError } = await supabase
+    // Check if streak already exists for today to avoid 403 on upsert without UPDATE policy
+    const { data: existingStreak } = await supabase
       .from('prayer_streaks')
-      .upsert({ user_id: user.id, date: today }, { onConflict: 'user_id,date' });
-    if (streakError) {
-      console.error('Failed to track prayer streak activity:', streakError);
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('date', today)
+      .maybeSingle();
+
+    if (!existingStreak) {
+      const { error: streakError } = await supabase
+        .from('prayer_streaks')
+        .insert({ user_id: user.id, date: today });
+      if (streakError) {
+        console.error('Failed to track prayer streak activity:', streakError);
+      }
     }
 
     const updates: { last_journal_visit_date?: string; last_prayer_added_date?: string } = {
