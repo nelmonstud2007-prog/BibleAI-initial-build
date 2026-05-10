@@ -145,7 +145,7 @@ export default function BibleStudyPanel({ isOpen, onClose, initialVerse, onVerse
     }
   }, [isOpen, initialVerse]);
 
-  co  const startStudy = async () => {
+  const startStudy = async () => {
     if (!user || !initialVerse) return;
     // Create conversation
     const title = `Bible Study: ${initialVerse.reference}`;
@@ -214,9 +214,8 @@ export default function BibleStudyPanel({ isOpen, onClose, initialVerse, onVerse
       setIsTyping(false);
     }
   };
-  };
 
-  c  const handleSend = async () => {
+  const handleSend = async () => {
     const text = input.trim();
     if (!text || isTyping || !conversationId) return;
     if (usage.tier === 'free' && usage.limit !== null && usage.used >= usage.limit) {
@@ -272,7 +271,7 @@ export default function BibleStudyPanel({ isOpen, onClose, initialVerse, onVerse
     } finally {
       setIsTyping(false);
     }
-  };  };
+  };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
