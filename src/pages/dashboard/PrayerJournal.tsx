@@ -20,6 +20,7 @@ import {
   Filter,
   Edit2,
   Search as SearchIcon,
+  Download,
 } from 'lucide-react';
 import UpgradeModal from '../../components/UpgradeModal';
 import { trackEvent } from '../../lib/analytics';
@@ -395,6 +396,32 @@ export default function PrayerJournal() {
     navigate('/dashboard/bible-chat', { state: { initialMessage: prompt } });
   };
 
+  const exportToPDF = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+    const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    const rows = entries.map(e => `
+      <div style="margin-bottom:24px;padding:20px;border:1px solid #e5e7eb;border-radius:12px;page-break-inside:avoid">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <h3 style="margin:0;font-size:16px;color:#111827">${e.title}</h3>
+          <span style="font-size:12px;padding:4px 10px;border-radius:20px;background:${e.status === 'answered' ? '#d1fae5' : '#fef3c7'};color:${e.status === 'answered' ? '#065f46' : '#92400e'}">${e.status === 'answered' ? '✓ Answered' : '🙏 Praying'}</span>
+        </div>
+        <p style="margin:4px 0;font-size:12px;color:#6b7280">${e.category} &bull; ${new Date(e.created_at).toLocaleDateString()}</p>
+        ${e.content ? `<p style="margin:12px 0 0;font-size:14px;color:#374151;line-height:1.6">${e.content}</p>` : ''}
+      </div>
+    `).join('');
+    printWindow.document.write(`
+      <!DOCTYPE html><html><head><title>Prayer Journal Export</title>
+      <style>body{font-family:Georgia,serif;max-width:700px;margin:40px auto;color:#111827;}
+      h1{font-size:28px;margin-bottom:4px;}p.sub{color:#6b7280;margin-bottom:32px;}
+      @media print{body{margin:20px;}}</style></head>
+      <body><h1>Sacred Prayer Journal</h1><p class="sub">Exported on ${date} &bull; ${entries.length} petition${entries.length !== 1 ? 's' : ''}</p>${rows}</body></html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => printWindow.print(), 500);
+  };
+
   return (
     <div className="p-4 sm:p-6 lg:p-10 max-w-6xl mx-auto space-y-10 animate-slide-up-fade">
       <ConfettiCanvas active={confettiActive} />
@@ -420,14 +447,24 @@ export default function PrayerJournal() {
           <p className="text-navy-300 font-medium">Record your heart&apos;s cries and watch God&apos;s faithful hand move.</p>
         </div>
 
-        <button
-          onClick={() => setShowForm(!showForm)}
-          className="relative group bg-gold-gradient text-navy-950 font-black px-8 py-4 rounded-2xl shadow-xl shadow-gold-400/10 hover:scale-[1.03] active:scale-[0.97] transition-all flex items-center justify-center gap-3 overflow-hidden"
-        >
-          <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-500" />
-          <Plus className="w-5 h-5 relative z-10" />
-          <span className="relative z-10 uppercase tracking-widest text-xs">New Petition</span>
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={exportToPDF}
+            title="Export journal as PDF"
+            className="flex items-center gap-2 px-4 py-3 bg-navy-800 border border-white/10 text-navy-300 hover:text-white hover:border-white/20 font-bold rounded-2xl transition-all text-sm"
+          >
+            <Download className="w-4 h-4" />
+            <span className="hidden sm:inline uppercase tracking-widest text-xs">Export PDF</span>
+          </button>
+          <button
+            onClick={() => setShowForm(!showForm)}
+            className="relative group bg-gold-gradient text-navy-950 font-black px-8 py-4 rounded-2xl shadow-xl shadow-gold-400/10 hover:scale-[1.03] active:scale-[0.97] transition-all flex items-center justify-center gap-3 overflow-hidden"
+          >
+            <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-500" />
+            <Plus className="w-5 h-5 relative z-10" />
+            <span className="relative z-10 uppercase tracking-widest text-xs">New Petition</span>
+          </button>
+        </div>
       </div>
 
       {/* Stats Cards */}

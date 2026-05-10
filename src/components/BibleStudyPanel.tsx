@@ -54,25 +54,33 @@ const formatMessageContent = (content: string, onVerseClick?: (ref: string) => v
   return result;
 };
 
+/**
+ * Word-aware typewriter: advances by whole words so multi-word Bible refs
+ * (e.g. "1 Corinthians 13:4") are never split mid-animation.
+ */
 const TypewriterMessage = ({ content, onComplete, onVerseClick }: { content: string; onComplete?: () => void; onVerseClick?: (ref: string) => void }) => {
-  const [displayedText, setDisplayedText] = useState('');
-  const [index, setIndex] = useState(0);
-  const CHUNK_SIZE = 8;
+  // Split into tokens: words + whitespace runs
+  const tokens = useMemo(() => content.match(/(\S+|\s+)/g) ?? [], [content]);
+  const [tokenIndex, setTokenIndex] = useState(0);
+  const TOKENS_PER_TICK = 3;
 
   useEffect(() => {
-    if (index < content.length) {
+    setTokenIndex(0);
+  }, [content]);
+
+  useEffect(() => {
+    if (tokenIndex < tokens.length) {
       const timer = setTimeout(() => {
-        const nextIndex = Math.min(index + CHUNK_SIZE, content.length);
-        setDisplayedText(content.substring(0, nextIndex));
-        setIndex(nextIndex);
-      }, 15);
+        setTokenIndex(prev => Math.min(prev + TOKENS_PER_TICK, tokens.length));
+      }, 18);
       return () => clearTimeout(timer);
-    } else if (onComplete) {
+    } else if (tokenIndex >= tokens.length && onComplete) {
       onComplete();
     }
-  }, [index, content, onComplete]);
+  }, [tokenIndex, tokens, onComplete]);
 
-  const isComplete = index >= content.length;
+  const isComplete = tokenIndex >= tokens.length;
+  const displayedText = tokens.slice(0, tokenIndex).join('');
 
   return (
     <div className="whitespace-pre-wrap break-words">
@@ -94,7 +102,7 @@ interface BibleStudyPanelProps {
   onVerseClick?: (ref: string) => void;
 }
 
-export default function BibleStudyPanel({ isOpen, onClose, initialVerse }: BibleStudyPanelProps) {
+export default function BibleStudyPanel({ isOpen, onClose, initialVerse, onVerseClick }: BibleStudyPanelProps) {
   const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');

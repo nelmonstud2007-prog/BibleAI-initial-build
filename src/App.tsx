@@ -17,6 +17,8 @@ import DailyVerse from './pages/dashboard/DailyVerse';
 import Settings from './pages/dashboard/Settings';
 import PrayerAnalytics from './pages/dashboard/PrayerAnalytics';
 import Bible from './pages/dashboard/Bible';
+import Bookmarks from './pages/dashboard/Bookmarks';
+import Community from './pages/dashboard/Community';
 import SeoMeta from './components/SeoMeta';
 import ErrorBoundary from './components/ErrorBoundary';
 
@@ -87,6 +89,8 @@ export default function App() {
             <Route path="bible" element={<Bible />} />
             <Route path="analytics" element={<PrayerAnalytics />} />
             <Route path="settings" element={<Settings />} />
+            <Route path="bookmarks" element={<Bookmarks />} />
+            <Route path="community" element={<Community />} />
           </Route>
         </Routes>
       </BrowserRouter>

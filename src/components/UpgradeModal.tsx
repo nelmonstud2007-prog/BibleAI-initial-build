@@ -104,10 +104,10 @@ export default function UpgradeModal({ open, onClose, limitType, limitDetail }: 
         </div>
 
         {/* Plan selector */}
-        <div className="grid grid-cols-2 gap-4 mb-8">
+        <div className="grid grid-cols-2 gap-4 mb-4">
           <button
             onClick={() => setSelectedPlan('monthly')}
-            className={`group relative p-6 rounded-3xl border transition-all duration-300 text-left ${
+            className={`group relative p-5 rounded-3xl border transition-all duration-300 text-left ${
               selectedPlan === 'monthly'
                 ? 'border-gold-400/50 bg-gold-400/5 shadow-lg shadow-gold-400/5'
                 : 'border-navy-800 bg-navy-800/40 hover:border-navy-700'
@@ -122,23 +122,35 @@ export default function UpgradeModal({ open, onClose, limitType, limitDetail }: 
           
           <button
             onClick={() => setSelectedPlan('yearly')}
-            className={`group relative p-6 rounded-3xl border transition-all duration-300 text-left ${
+            className={`group relative p-5 rounded-3xl border transition-all duration-300 text-left ${
               selectedPlan === 'yearly'
-                ? 'border-gold-400/50 bg-gold-400/5 shadow-lg shadow-gold-400/5'
+                ? 'border-gold-400/50 bg-gold-400/5 shadow-lg shadow-gold-400/5 ring-1 ring-gold-400/30'
                 : 'border-navy-800 bg-navy-800/40 hover:border-navy-700'
             }`}
           >
-            <div className="absolute -top-3 right-4 bg-gold-gradient text-navy-950 text-[10px] font-black px-4 py-1.5 rounded-full shadow-lg">
-              BEST VALUE &bull; SAVE 33%
+            <div className="absolute -top-3 right-3 bg-gold-gradient text-navy-950 text-[9px] font-black px-3 py-1 rounded-full shadow-lg flex items-center gap-1">
+              <Star className="w-2.5 h-2.5" /> MOST POPULAR
             </div>
             <p className={`text-xs font-black uppercase tracking-widest mb-2 ${selectedPlan === 'yearly' ? 'text-gold-400' : 'text-navy-500'}`}>Annual</p>
             <div className="flex items-baseline gap-1">
               <span className="text-2xl font-bold text-white">$39.99</span>
               <span className="text-xs text-navy-400">/yr</span>
             </div>
-            <p className="text-[10px] font-bold text-navy-500 mt-1">$3.33 per month</p>
+            <p className="text-[10px] font-bold text-emerald-400 mt-1">$3.33/mo — save $19.89</p>
           </button>
         </div>
+
+        {/* Annual savings callout */}
+        {selectedPlan === 'yearly' && (
+          <div className="mb-6 bg-emerald-400/5 border border-emerald-400/20 rounded-2xl px-4 py-3 flex items-center gap-3 animate-slide-up-fade">
+            <div className="w-8 h-8 bg-emerald-400/10 rounded-xl flex items-center justify-center flex-shrink-0">
+              <Sparkles className="w-4 h-4 text-emerald-400" />
+            </div>
+            <p className="text-xs text-emerald-300 font-bold">
+              You save <span className="text-emerald-400">$19.89 per year</span> compared to monthly — that's 4 months free!
+            </p>
+          </div>
+        )}
 
         {/* Features list */}
         <div className="bg-navy-800/30 border border-navy-800/50 rounded-3xl p-6 mb-8">

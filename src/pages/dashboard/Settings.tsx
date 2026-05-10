@@ -84,6 +84,29 @@ export default function Settings() {
     setTimeout(() => setSaved(false), 2000);
   };
 
+  const subscribeToWebPush = async () => {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const vapidKey = import.meta.env.VITE_VAPID_PUBLIC_KEY;
+      if (!vapidKey) return; // VAPID not configured yet
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: vapidKey,
+      });
+      // Store subscription in Supabase for server-side push delivery
+      await supabase.from('push_subscriptions').upsert({
+        user_id: user!.id,
+        endpoint: sub.endpoint,
+        p256dh: btoa(String.fromCharCode(...new Uint8Array(sub.getKey('p256dh')!))),
+        auth: btoa(String.fromCharCode(...new Uint8Array(sub.getKey('auth')!))),
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'user_id' });
+    } catch (err) {
+      console.warn('Web Push subscription failed:', err);
+    }
+  };
+
   const handleReminderToggle = async (enabled: boolean) => {
     if (enabled && typeof Notification !== 'undefined') {
       if (Notification.permission === 'default') {
@@ -99,6 +122,9 @@ export default function Settings() {
         showToast('Please enable notifications in your browser settings');
         return;
       }
+      // Register Web Push subscription
+      await subscribeToWebPush();
+      showToast('Push notifications enabled!');
     }
     setDailyReminderEnabled(enabled);
   };

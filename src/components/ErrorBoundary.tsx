@@ -4,6 +4,7 @@ import { Cross, RefreshCw, Home } from 'lucide-react';
 
 interface Props {
   children: ReactNode;
+  fallback?: ReactNode;
 }
 
 interface State {
@@ -27,6 +28,7 @@ export default class ErrorBoundary extends Component<Props, State> {
 
   public render() {
     if (this.state.hasError) {
+      if (this.props.fallback) return this.props.fallback;
       return (
         <div className="min-h-screen bg-navy-950 flex items-center justify-center p-6">
           <div className="w-full max-w-md bg-navy-900 border border-gold-400/20 rounded-[2.5rem] p-12 shadow-2xl text-center space-y-8 animate-scale-in">
@@ -39,11 +41,16 @@ export default class ErrorBoundary extends Component<Props, State> {
               <p className="text-navy-300 text-sm leading-relaxed font-medium">
                 We're sorry for the interruption. We've been notified and are working to restore the sacred space.
               </p>
+              {this.state.error && (
+                <p className="text-[10px] font-mono text-navy-600 bg-navy-950/50 rounded-xl px-4 py-2 mt-2 break-all">
+                  {this.state.error.message}
+                </p>
+              )}
             </div>
 
             <div className="flex flex-col gap-3">
               <button
-                onClick={() => window.location.reload()}
+                onClick={() => { this.setState({ hasError: false, error: null }); window.location.reload(); }}
                 className="w-full bg-gold-gradient text-navy-950 font-black py-4 rounded-2xl shadow-xl shadow-gold-400/10 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 uppercase tracking-widest text-xs"
               >
                 <RefreshCw className="w-4 h-4" />
@@ -52,7 +59,7 @@ export default class ErrorBoundary extends Component<Props, State> {
               
               <Link
                 to="/dashboard"
-                onClick={() => this.setState({ hasError: false })}
+                onClick={() => this.setState({ hasError: false, error: null })}
                 className="w-full bg-navy-800 text-white font-black py-4 rounded-2xl border border-white/5 hover:bg-navy-700 transition-all flex items-center justify-center gap-2 uppercase tracking-widest text-xs"
               >
                 <Home className="w-4 h-4 text-gold-400" />
@@ -68,6 +75,6 @@ export default class ErrorBoundary extends Component<Props, State> {
       );
     }
 
-    return this.children;
+    return this.props.children;
   }
 }

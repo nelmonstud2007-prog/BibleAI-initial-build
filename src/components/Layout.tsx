@@ -15,11 +15,14 @@ import {
   Flame,
   ChevronRight,
   Sparkles,
-  Mail
+  Mail,
+  Bookmark,
+  Users
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import UpgradeModal from './UpgradeModal';
 import OnboardingTour from './OnboardingTour';
+import OnboardingQuiz from './OnboardingQuiz';
 import { supabase } from '../lib/supabase';
 import { useStreak } from '../lib/useStreak';
 
@@ -35,6 +38,8 @@ const navItems: Array<{
   { path: '/dashboard/prayer-journal', label: 'Journal', icon: BookOpen },
   { path: '/dashboard/daily-verse', label: 'Daily', icon: Sun },
   { path: '/dashboard/analytics', label: 'Stats', icon: BarChart3, proOnly: true },
+  { path: '/dashboard/bookmarks', label: 'Saved', icon: Bookmark },
+  { path: '/dashboard/community', label: 'Community', icon: Users },
   { path: '/dashboard/settings', label: 'Settings', icon: Settings },
 ];
 
@@ -44,10 +49,18 @@ export default function DashboardLayout() {
   const [showUpgrade, setShowUpgrade] = useState(false);
   const { streak, loading: streakLoading } = useStreak(user?.id);
 
+  const isActive = (path: string) => location.pathname === path;
+
+  const visibleNavItems = navItems.filter(item => {
+    if (item.proOnly && !isPro) return false;
+    return true;
+  });
+
   return (
     <div className="min-h-screen bg-navy-950 flex selection:bg-gold-400/30 selection:text-white">
       <UpgradeModal open={showUpgrade} onClose={() => setShowUpgrade(false)} />
       <OnboardingTour />
+      <OnboardingQuiz />
 
       {/* Modern Minimalist Sidebar */}
       <aside className="hidden lg:flex lg:flex-col lg:static inset-y-0 left-0 z-50 w-64 bg-navy-900 border-r border-white/5 relative overflow-hidden">
