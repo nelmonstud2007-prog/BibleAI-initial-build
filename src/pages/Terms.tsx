@@ -50,8 +50,8 @@ export default function Terms() {
             <h2 className="text-lg font-semibold text-white mb-3">Contact</h2>
             <p>
               For billing or terms questions, email{' '}
-              <a href="mailto:bibleaisupportcontact@gmail.com" className="text-gold-400 hover:text-gold-300">
-                bibleaisupportcontact@gmail.com
+              <a href="mailto:bibleaiofficialcontact@gmail.com" className="text-gold-400 hover:text-gold-300">
+                bibleaiofficialcontact@gmail.com
               </a>
               .
             </p>
