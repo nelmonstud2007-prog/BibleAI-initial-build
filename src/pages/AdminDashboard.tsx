@@ -46,9 +46,11 @@ export default function AdminDashboard() {
   const [authenticated, setAuthenticated] = useState(false);
   const [password, setPassword] = useState('');
   const [passwordError, setPasswordError] = useState('');
-  const [activeTab, setActiveTab] = useState<'analytics' | 'users'>('analytics');
+  const [activeTab, setActiveTab] = useState<'analytics' | 'users' | 'contacts' | 'flagged'>('analytics');
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [users, setUsers] = useState<UserRow[]>([]);
+  const [contactSubmissions, setContactSubmissions] = useState<any[]>([]);
+  const [flaggedContent, setFlaggedContent] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -307,7 +309,7 @@ export default function AdminDashboard() {
       <div className="max-w-7xl mx-auto p-6 space-y-6">
         {/* Tabs */}
         <div className="flex gap-2 border-b border-white/5 pb-4">
-          {([['analytics', BarChart3, 'Analytics'], ['users', Users, 'Users']] as const).map(([id, Icon, label]) => (
+          {([['analytics', BarChart3, 'Analytics'], ['users', Users, 'Users'], ['contacts', MessageSquare, 'Contact'], ['flagged', AlertCircle, 'Flagged']] as const).map(([id, Icon, label]) => (
             <button key={id} onClick={() => setActiveTab(id as any)}
               className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === id ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'text-navy-400 hover:text-white'}`}>
               <Icon className="w-4 h-4" /> {label}
@@ -391,6 +393,104 @@ export default function AdminDashboard() {
           </div>
         )}
 
+        {/* Contact Submissions Tab */}
+        {activeTab === 'contacts' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold text-white">Contact Form Submissions</h2>
+              <button onClick={async () => {
+                const { data } = await supabase.from('contact_submissions').select('*').order('submitted_at', { ascending: false }).limit(50);
+                setContactSubmissions(data || []);
+              }} className="text-xs text-navy-400 hover:text-white transition-colors flex items-center gap-1">
+                <RefreshCw className="w-3 h-3" /> Refresh
+              </button>
+            </div>
+            {contactSubmissions.length === 0 ? (
+              <button onClick={async () => {
+                const { data } = await supabase.from('contact_submissions').select('*').order('submitted_at', { ascending: false }).limit(50);
+                setContactSubmissions(data || []);
+              }} className="w-full py-12 text-navy-500 text-sm hover:text-navy-300 transition-colors">
+                Click to load contact submissions
+              </button>
+            ) : (
+              <div className="space-y-3">
+                {contactSubmissions.map((c: any) => (
+                  <div key={c.id} className={`bg-navy-900/50 border rounded-2xl p-4 ${c.resolved ? 'border-emerald-500/20 opacity-60' : 'border-white/10'}`}>
+                    <div className="flex items-start justify-between gap-3 mb-2">
+                      <div>
+                        <p className="text-sm font-bold text-white">{c.name} <span className="text-navy-400 font-normal">({c.email})</span></p>
+                        <p className="text-xs text-gold-400 font-semibold">{c.subject}</p>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className="text-[10px] text-navy-500">{new Date(c.submitted_at).toLocaleDateString()}</span>
+                        {!c.resolved ? (
+                          <button onClick={async () => {
+                            await supabase.from('contact_submissions').update({ resolved: true, resolved_at: new Date().toISOString(), resolved_by: user?.id }).eq('id', c.id);
+                            setContactSubmissions((prev: any[]) => prev.map((x: any) => x.id === c.id ? { ...x, resolved: true } : x));
+                          }} className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-1 rounded-lg hover:bg-emerald-500/20 transition-all">
+                            Mark Resolved
+                          </button>
+                        ) : (
+                          <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-lg">Resolved</span>
+                        )}
+                      </div>
+                    </div>
+                    <p className="text-sm text-navy-300 leading-relaxed whitespace-pre-wrap">{c.message}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+        {/* Flagged Content Tab */}
+        {activeTab === 'flagged' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold text-white">Flagged Content</h2>
+              <button onClick={async () => {
+                const { data } = await supabase.from('flagged_content').select('*').order('created_at', { ascending: false }).limit(50);
+                setFlaggedContent(data || []);
+              }} className="text-xs text-navy-400 hover:text-white transition-colors flex items-center gap-1">
+                <RefreshCw className="w-3 h-3" /> Refresh
+              </button>
+            </div>
+            {flaggedContent.length === 0 ? (
+              <button onClick={async () => {
+                const { data } = await supabase.from('flagged_content').select('*').order('created_at', { ascending: false }).limit(50);
+                setFlaggedContent(data || []);
+              }} className="w-full py-12 text-navy-500 text-sm hover:text-navy-300 transition-colors">
+                Click to load flagged content
+              </button>
+            ) : (
+              <div className="space-y-3">
+                {flaggedContent.map((f: any) => (
+                  <div key={f.id} className={`bg-navy-900/50 border rounded-2xl p-4 ${f.reviewed ? 'border-emerald-500/20 opacity-60' : 'border-red-500/20'}`}>
+                    <div className="flex items-start justify-between gap-3 mb-2">
+                      <div>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-red-400 bg-red-500/10 px-2 py-0.5 rounded-full">{f.reason || 'unknown'}</span>
+                        <span className="ml-2 text-[10px] text-navy-500">{f.content_type}</span>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className="text-[10px] text-navy-500">{new Date(f.created_at).toLocaleDateString()}</span>
+                        {!f.reviewed ? (
+                          <button onClick={async () => {
+                            await supabase.from('flagged_content').update({ reviewed: true, reviewed_at: new Date().toISOString(), reviewed_by: user?.id }).eq('id', f.id);
+                            setFlaggedContent((prev: any[]) => prev.map((x: any) => x.id === f.id ? { ...x, reviewed: true } : x));
+                          }} className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-1 rounded-lg hover:bg-emerald-500/20 transition-all">
+                            Mark Reviewed
+                          </button>
+                        ) : (
+                          <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-lg">Reviewed</span>
+                        )}
+                      </div>
+                    </div>
+                    <p className="text-sm text-navy-300 leading-relaxed">{f.content}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         {/* Users Tab */}
         {activeTab === 'users' && (
           <div className="space-y-4">

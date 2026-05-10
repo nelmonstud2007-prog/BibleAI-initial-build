@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { Mail, Lock, Loader2, ArrowRight, User, CheckCircle2, Cross, Eye, EyeOff, Sparkles, Heart, BookOpen, AtSign, AlertCircle } from 'lucide-react';
+import { Mail, Lock, Loader2, ArrowRight, User, CheckCircle2, Cross, Eye, EyeOff, Sparkles, Heart, BookOpen, AtSign, AlertCircle, Check, X as XIcon } from 'lucide-react';
 import { trackEvent } from '../lib/analytics';
 
 const SOCIAL_PROOF = [
@@ -24,6 +24,31 @@ export default function SignUp() {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  // Username availability debounce
+  const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
+  const [checkingUsername, setCheckingUsername] = useState(false);
+  const usernameDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!username || username.length < 3 || !/^[a-zA-Z0-9_]{3,20}$/.test(username)) {
+      setUsernameAvailable(null);
+      setCheckingUsername(false);
+      return;
+    }
+    setCheckingUsername(true);
+    setUsernameAvailable(null);
+    if (usernameDebounceRef.current) clearTimeout(usernameDebounceRef.current);
+    usernameDebounceRef.current = setTimeout(async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('username', username.toLowerCase())
+        .maybeSingle();
+      setUsernameAvailable(!data);
+      setCheckingUsername(false);
+    }, 500);
+    return () => { if (usernameDebounceRef.current) clearTimeout(usernameDebounceRef.current); };
+  }, [username]);
 
   const passwordStrength = (() => {
     if (password.length === 0) return 0;
@@ -51,8 +76,12 @@ export default function SignUp() {
     if (!agreedToTerms) { setError('You must agree to the Terms of Service and Privacy Policy.'); return; }
     setLoading(true);
     try {
-      const { data: existing } = await supabase.from('profiles').select('id').eq('username', username.toLowerCase()).maybeSingle();
-      if (existing) { setError('That username is already taken.'); setLoading(false); return; }
+      // Final check if debounce hasn't confirmed availability
+      if (usernameAvailable === false) { setError('That username is already taken.'); setLoading(false); return; }
+      if (usernameAvailable === null) {
+        const { data: existing } = await supabase.from('profiles').select('id').eq('username', username.toLowerCase()).maybeSingle();
+        if (existing) { setError('That username is already taken.'); setLoading(false); return; }
+      }
       const { data, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
@@ -278,9 +307,19 @@ export default function SignUp() {
                       required
                       autoComplete="username"
                       maxLength={20}
-                      className="w-full bg-white/[0.03] border border-white/8 rounded-2xl pl-12 pr-5 py-4 text-sm text-white placeholder:text-navy-700 focus:outline-none focus:border-gold-400/40 focus:bg-white/[0.05] transition-all"
+                      className={`w-full bg-white/[0.03] border rounded-2xl pl-12 pr-10 py-4 text-sm text-white placeholder:text-navy-700 focus:outline-none focus:bg-white/[0.05] transition-all ${
+                        usernameAvailable === true ? 'border-emerald-400/40 focus:border-emerald-400/60' :
+                        usernameAvailable === false ? 'border-red-400/40 focus:border-red-400/60' :
+                        'border-white/8 focus:border-gold-400/40'
+                      }`}
                       placeholder="your_username (3–20 chars)"
                     />
+                    {/* Availability indicator */}
+                    <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                      {checkingUsername && <Loader2 className="w-4 h-4 text-navy-500 animate-spin" />}
+                      {!checkingUsername && usernameAvailable === true && <Check className="w-4 h-4 text-emerald-400" />}
+                      {!checkingUsername && usernameAvailable === false && <XIcon className="w-4 h-4 text-red-400" />}
+                    </div>
                   </div>
                 </div>
 

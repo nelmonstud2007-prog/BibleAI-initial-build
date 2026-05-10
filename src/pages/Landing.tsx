@@ -20,6 +20,7 @@ import {
 import { useState, useEffect } from 'react';
 import { useInView } from 'react-intersection-observer';
 import { useAuth } from '../context/AuthContext';
+import { supabase } from '../lib/supabase';
 
 const features = [
   {
@@ -58,12 +59,8 @@ const churchIcons = [
   { icon: Sparkles, label: 'Divine Wisdom' },
 ];
 
-const stats = [
-  { label: 'Active Users', value: '50K+', icon: Users },
-  { label: 'Prayers Tracked', value: '2.3M+', icon: Heart },
-  { label: 'Bible Questions Answered', value: '5.8M+', icon: MessageCircle },
-  { label: 'Community Posts', value: '180K+', icon: BookOpen },
-];
+// Live stats fetched from Supabase
+interface PlatformStats { users: number; verses_saved: number; forum_posts: number; app_version: string; }
 
 const testimonials = [
   {
@@ -86,10 +83,52 @@ const testimonials = [
   },
 ];
 
+const faqCategories = [
+  {
+    category: 'General',
+    items: [
+      { question: 'Is Bible AI free to use?', answer: 'Yes! Bible AI offers a generous free plan with 10 AI messages daily, 3 verse rerolls/day, 3 forum posts/day, and full access to Bible Reader and devotionals. Upgrade to Pro ($4.99/month) for unlimited messages, voice reading, and priority support.' },
+      { question: 'Is Bible AI affiliated with any church or denomination?', answer: 'No. Bible AI is completely non-denominational and respects all Christian traditions. The AI provides scripture-grounded answers while acknowledging diverse theological perspectives without favouring any particular denomination.' },
+      { question: 'Can I use Bible AI offline?', answer: 'Bible AI requires an internet connection for AI features. However, you can export your journal entries and saved verses for offline reading at any time.' },
+      { question: 'What Bible translations are supported?', answer: 'Bible AI supports ESV, NIV, KJV, and NASB translations. You can switch translations at any time in the Bible Reader.' },
+    ],
+  },
+  {
+    category: 'Bible Chat',
+    items: [
+      { question: 'How does the AI interpret verses?', answer: 'The AI provides context-aware interpretations, cross-references related passages, and acknowledges different theological perspectives. It always cites specific verses so you can verify everything in Scripture.' },
+      { question: 'Is my data stored or used to train the AI?', answer: 'Your chat history is stored securely in your private account and is never used to train AI models. All personal data is protected by Row Level Security — only you can access your conversations.' },
+      { question: 'How do I report a bug or inappropriate content?', answer: 'Use the flag button on any post or comment in the Community Forum. For bugs, use the Contact form. Our team reviews all reports promptly.' },
+    ],
+  },
+  {
+    category: 'Subscription & Billing',
+    items: [
+      { question: "What's the difference between Free and Pro?", answer: 'Free: 10 AI messages/day, 3 verse rerolls/day, 3 forum posts/day, full Bible Reader, daily devotionals. Pro: unlimited AI messages, unlimited rerolls, 10 forum posts/day, voice reading, priority support.' },
+      { question: 'How do I cancel my subscription?', answer: 'Cancel anytime from Settings → Subscription. Your Pro features remain active until end of billing period, then revert to free. No penalties.' },
+      { question: 'What happens to my data if I delete my account?', answer: 'Your account is soft-deleted immediately and all personal data is permanently deleted within 30 days. Download your data first via Settings → Privacy.' },
+    ],
+  },
+  {
+    category: 'Privacy & Data',
+    items: [
+      { question: 'Is my prayer journal completely private?', answer: 'Absolutely. Your journal is protected by Row Level Security — only you can access it. No one else, including admins, can read your private journal entries.' },
+      { question: 'How is my data encrypted?', answer: 'All data uses TLS 1.3 encryption in transit and AES-256 at rest via Supabase enterprise infrastructure. We never share personal data with third parties.' },
+      { question: 'Can I download all my data?', answer: 'Yes. Go to Settings → Privacy → "Download my data" to export a complete JSON of your account data.' },
+    ],
+  },
+  {
+    category: 'Technical',
+    items: [
+      { question: 'How often is the Verse of the Day updated?', answer: 'The Verse of the Day updates daily at midnight UTC. If you see the same verse, try refreshing the page.' },
+      { question: "Why is the AI response slow sometimes?", answer: 'AI response speed depends on server load and your internet connection. We use streaming responses so you see text as it generates.' },
+    ],
+  },
+];
 const faqs = [
   {
-    question: 'Is BibleAI free to use?',
-    answer: 'Yes! BibleAI offers a generous free plan with 5 AI messages daily, 3 forum posts, and full access to Bible Reader and devotionals. Upgrade to Pro ($4.99/month) for unlimited messages, voice reading, and priority support.',
+    question: 'Is Bible AI free to use?',
+    answer: 'Yes! Bible AI offers a generous free plan with 10 AI messages daily, 3 verse rerolls/day, 3 forum posts/day, and full access to Bible Reader and devotionals.',
   },
   {
     question: 'What Bible translations are available?',
@@ -198,6 +237,8 @@ export default function Landing() {
   const { user, profileCompleted } = useAuth();
   const isLoggedIn = Boolean(user && profileCompleted);
   const [isScrolled, setIsScrolled] = useState(false);
+  const [platformStats, setPlatformStats] = useState<PlatformStats | null>(null);
+  const [activeFaqCategory, setActiveFaqCategory] = useState('General');
 
   const ctaLink = isLoggedIn ? '/dashboard' : '/signup';
   const ctaText = isLoggedIn ? 'Go to Dashboard' : 'Start Your Journey Free';
@@ -208,6 +249,30 @@ export default function Landing() {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  useEffect(() => {
+    // Fetch live platform stats from Supabase
+    supabase.rpc('get_platform_stats').then(({ data }) => {
+      if (data) setPlatformStats(data as PlatformStats);
+    });
+  }, []);
+
+  const formatStatValue = (key: string, value: number): string => {
+    if (key === 'users') {
+      if (value < 10) return 'A growing community';
+      if (value < 100) return `${value}+ believers`;
+      return `${value.toLocaleString()}+`;
+    }
+    if (key === 'verses_saved') {
+      if (value < 10) return 'Verses being saved';
+      return `${value.toLocaleString()}+`;
+    }
+    if (key === 'forum_posts') {
+      if (value < 5) return 'Community growing';
+      return `${value.toLocaleString()}+`;
+    }
+    return String(value);
+  };
 
   return (
     <div className="min-h-screen bg-navy-950 selection:bg-gold-400/30 selection:text-white">
@@ -228,10 +293,7 @@ export default function Landing() {
             <a href="#features" className="text-sm font-semibold text-navy-300 hover:text-white transition-colors">Features</a>
             <a href="#demo" className="text-sm font-semibold text-navy-300 hover:text-white transition-colors">How it works</a>
             <a href="#pricing" className="text-sm font-semibold text-navy-300 hover:text-white transition-colors">Pricing</a>
-            <div className="flex items-center gap-2 px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full">
-               <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-               <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Live Status</span>
-            </div>
+            <a href="#faq" className="text-sm font-semibold text-navy-300 hover:text-white transition-colors">FAQ</a>
           </div>
 
           <div className="flex items-center gap-6">
@@ -419,25 +481,32 @@ export default function Landing() {
         </div>
       </AnimatedSection>
 
-      {/* Stats Section */}
-      <AnimatedSection className="py-32 bg-navy-900/40 border-y border-white/5">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-            {stats.map((stat, i) => {
-              const Icon = stat.icon;
-              return (
-                <div key={i} className="text-center">
-                  <div className="flex justify-center mb-4">
-                    <Icon className="w-8 h-8 text-gold-400" />
+      {/* Live Stats Section */}
+      {platformStats && (
+        <AnimatedSection className="py-32 bg-navy-900/40 border-y border-white/5">
+          <div className="max-w-7xl mx-auto px-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+              {[
+                { label: 'Registered Users', value: formatStatValue('users', platformStats.users), icon: Users },
+                { label: 'Verses Saved', value: formatStatValue('verses_saved', platformStats.verses_saved), icon: BookOpen },
+                { label: 'Community Posts', value: formatStatValue('forum_posts', platformStats.forum_posts), icon: MessageCircle },
+                { label: 'App Version', value: `v${platformStats.app_version}`, icon: Sparkles },
+              ].map((stat, i) => {
+                const Icon = stat.icon;
+                return (
+                  <div key={i} className="text-center">
+                    <div className="flex justify-center mb-4">
+                      <Icon className="w-8 h-8 text-gold-400" />
+                    </div>
+                    <div className="text-2xl sm:text-3xl font-black text-white mb-2">{stat.value}</div>
+                    <div className="text-sm text-navy-400 font-medium">{stat.label}</div>
                   </div>
-                  <div className="text-3xl sm:text-4xl font-black text-white mb-2">{stat.value}</div>
-                  <div className="text-sm text-navy-400 font-medium">{stat.label}</div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
-        </div>
-      </AnimatedSection>
+        </AnimatedSection>
+      )}
       {/* Testimonials Section */}
       <AnimatedSection className="py-32 bg-white/2 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-6">
@@ -467,16 +536,34 @@ export default function Landing() {
       </AnimatedSection>
 
       {/* FAQ Section */}
-      <AnimatedSection className="py-32">
+      <AnimatedSection id="faq" className="py-32">
         <div className="max-w-4xl mx-auto px-6">
           <div className="text-center mb-16">
-            <h2 className="text-3xl sm:text-5xl font-bold text-white mb-6">Common Questions</h2>
-            <p className="text-navy-300">Everything you need to know about your new spiritual assistant.</p>
+            <h2 className="text-3xl sm:text-5xl font-bold text-white mb-6">Frequently Asked Questions</h2>
+            <p className="text-navy-300">Everything you need to know about Bible AI.</p>
           </div>
-          <div className="bg-navy-900/40 border border-white/5 p-4 sm:p-10 rounded-[3rem]">
-            {faqs.map(faq => (
-              <FAQItem key={faq.question} question={faq.question} answer={faq.answer} />
+          {/* Category tabs */}
+          <div className="flex flex-wrap gap-2 justify-center mb-8">
+            {faqCategories.map((cat) => (
+              <button
+                key={cat.category}
+                onClick={() => setActiveFaqCategory(cat.category)}
+                className={`px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all ${
+                  activeFaqCategory === cat.category
+                    ? 'bg-gold-400 text-navy-950'
+                    : 'bg-white/5 border border-white/10 text-navy-300 hover:text-white'
+                }`}
+              >
+                {cat.category}
+              </button>
             ))}
+          </div>
+          <div className="bg-navy-900/40 border border-white/5 px-6 rounded-2xl">
+            {faqCategories
+              .find((c) => c.category === activeFaqCategory)
+              ?.items.map((item) => (
+                <FAQItem key={item.question} question={item.question} answer={item.answer} />
+              ))}
           </div>
         </div>
       </AnimatedSection>
