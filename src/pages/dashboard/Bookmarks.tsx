@@ -61,6 +61,9 @@ export default function Bookmarks() {
   const [newCollectionColor, setNewCollectionColor] = useState(0);
   const [savingCollection, setSavingCollection] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const bookmarksPerPage = 12;
 
   const fetchData = useCallback(async () => {
     if (!user) return;
@@ -74,9 +77,10 @@ export default function Bookmarks() {
           .order('created_at', { ascending: true }),
         supabase
           .from('verse_bookmarks')
-          .select('*')
+          .select('*', { count: 'exact' })
           .eq('user_id', user.id)
-          .order('created_at', { ascending: false }),
+          .order('created_at', { ascending: false })
+          .range(0, bookmarksPerPage - 1),
       ]);
       setCollections((colRes.data as BookmarkCollection[]) ?? []);
       setBookmarks((bmRes.data as BookmarkItem[]) ?? []);

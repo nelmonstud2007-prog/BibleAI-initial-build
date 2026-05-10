@@ -152,7 +152,11 @@ export default function PrayerJournal() {
   const { user, isPro } = useAuth();
   const navigate = useNavigate();
   const [entries, setEntries] = useState<PrayerEntry[]>([]);
-  const [loading, setLoading] = useState(true);
+  
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const entriesPerPage = 10;
+const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');

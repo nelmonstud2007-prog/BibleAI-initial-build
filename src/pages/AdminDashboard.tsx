@@ -44,7 +44,11 @@ export default function AdminDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [authenticated, setAuthenticated] = useState(false);
-  const [password, setPassword] = useState('');
+  
+  const [userPage, setUserPage] = useState(1);
+  const [postPage, setPostPage] = useState(1);
+  const itemsPerPage = 15;
+const [password, setPassword] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [activeTab, setActiveTab] = useState<'analytics' | 'users' | 'contacts' | 'flagged'>('analytics');
   const [analytics, setAnalytics] = useState<Analytics | null>(null);

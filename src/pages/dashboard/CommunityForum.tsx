@@ -76,6 +76,9 @@ export default function CommunityForum() {
   const [newComment, setNewComment] = useState('');
   const [postingComment, setPostingComment] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const postsPerPage = 10;
 
   const categories = [
     { id: 'all', label: 'All Posts' },
@@ -93,15 +96,16 @@ export default function CommunityForum() {
   };
 
   useEffect(() => {
-    loadPosts();
+    setCurrentPage(1);
+    loadPosts(1);
   }, [sortBy, selectedCategory, searchQuery]);
 
-  const loadPosts = async () => {
+  const loadPosts = async (page: number) => {
     setLoading(true);
     try {
       let query = supabase
         .from('forum_posts')
-        .select('*, profiles(username, avatar_url)')
+        .select('*, profiles(username, avatar_url)', { count: 'exact' })
         .order('is_pinned', { ascending: false });
 
       if (selectedCategory !== 'all') {
@@ -125,10 +129,15 @@ export default function CommunityForum() {
         query = query.or(`title.ilike.%${searchQuery}%,content.ilike.%${searchQuery}%`);
       }
 
-      const { data, error } = await query;
+      const from = (page - 1) * postsPerPage;
+      const to = from + postsPerPage - 1;
+      query = query.range(from, to);
+
+      const { data, error, count } = await query;
 
       if (error) throw error;
       setPosts(data || []);
+      setTotalPages(Math.ceil((count || 0) / postsPerPage));
     } catch (err) {
       console.error('Failed to load posts:', err);
       showToast('Failed to load posts');
