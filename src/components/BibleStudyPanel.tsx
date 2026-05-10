@@ -18,13 +18,15 @@ interface Message {
   content: string;
 }
 
-const formatMessageContent = (content: string, onVerseClick?: (ref: string) => void) => {
+const formatMessageContent = (content: string | null | undefined, onVerseClick?: (ref: string) => void) => {
+  if (!content || typeof content !== 'string') return null;
   const verseRegex = /([1-3]\s+)?[A-Z][a-z]+\s+\d+:\d+(-\d+)?/g;
   const result: (string | JSX.Element)[] = [];
   let lastIndex = 0;
-  let match;
+  let match = null;
 
-  while ((match = verseRegex.exec(content)) !== null) {
+  try {
+    while ((match = verseRegex.exec(content)) !== null) {
     result.push(content.substring(lastIndex, match.index));
     const ref = match[0];
     
@@ -48,9 +50,13 @@ const formatMessageContent = (content: string, onVerseClick?: (ref: string) => v
         </span>
       );
     }
-    lastIndex = verseRegex.lastIndex;
+      lastIndex = verseRegex.lastIndex;
+    }
+    result.push(content.substring(lastIndex));
+  } catch (err) {
+    console.error('Error formatting message content:', err);
+    return [content];
   }
-  result.push(content.substring(lastIndex));
   return result;
 };
 
@@ -59,8 +65,13 @@ const formatMessageContent = (content: string, onVerseClick?: (ref: string) => v
  * (e.g. "1 Corinthians 13:4") are never split mid-animation.
  */
 const TypewriterMessage = ({ content, onComplete, onVerseClick }: { content: string; onComplete?: () => void; onVerseClick?: (ref: string) => void }) => {
+  if (!content) return null;
   // Split into tokens: words + whitespace runs
-  const tokens = useMemo(() => (content || '').match(/(\S+|\s+)/g) ?? [], [content]);
+  const tokens = useMemo(() => {
+    if (!content) return [];
+    const matched = content.match(/(\S+|\s+)/g);
+    return matched ?? [];
+  }, [content]);
   const [tokenIndex, setTokenIndex] = useState(0);
   const TOKENS_PER_TICK = 3;
 
@@ -134,9 +145,8 @@ export default function BibleStudyPanel({ isOpen, onClose, initialVerse, onVerse
     }
   }, [isOpen, initialVerse]);
 
-  const startStudy = async () => {
+  co  const startStudy = async () => {
     if (!user || !initialVerse) return;
-
     // Create conversation
     const title = `Bible Study: ${initialVerse.reference}`;
     const { data: conv, error: convError } = await supabase
@@ -144,14 +154,11 @@ export default function BibleStudyPanel({ isOpen, onClose, initialVerse, onVerse
       .insert({ user_id: user.id, title })
       .select('id')
       .single();
-
     if (convError) {
       console.error('Failed to create study conversation:', convError);
       return;
     }
-
     setConversationId(conv.id);
-
     // Prepare initial message
     const initialText = `I am studying ${initialVerse.reference}: "${initialVerse.text}". Can you give me Bible verses and guidance about this?`;
     const userMessage: Message = {
@@ -159,80 +166,113 @@ export default function BibleStudyPanel({ isOpen, onClose, initialVerse, onVerse
       role: 'user',
       content: initialText,
     };
-
     setMessages([userMessage]);
     setIsTyping(true);
-
     try {
-      const { data, error } = await supabase.functions.invoke('bible-chat', {
-        body: {
+      const { data: { session } } = await supabase.auth.getSession();
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/bible-chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`,
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({
           messages: [{ role: 'user', content: initialText }],
           conversation_id: conv.id,
-        },
+        }),
       });
 
-      if (error) throw error;
+      if (!response.ok) throw new Error('Failed to get response');
+
+      let fullContent = '';
+      const reader = response.body?.getReader();
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const chunk = new TextDecoder().decode(value);
+          fullContent += chunk;
+        }
+      }
 
       const assistantMessage: Message = {
         id: `initial-resp-${Date.now()}`,
         role: 'assistant',
-        content: data.content,
+        content: fullContent || 'Unable to process response',
       };
-
       setMessages((prev) => [...prev, assistantMessage]);
-      if (data.usage) setUsage(data.usage);
     } catch (err) {
       console.error('Study error:', err);
+      const errorMessage: Message = {
+        id: `error-${Date.now()}`,
+        role: 'assistant',
+        content: 'Sorry, I encountered an error while processing your request. Please try again.',
+      };
+      setMessages((prev) => [...prev, errorMessage]);
     } finally {
       setIsTyping(false);
     }
   };
+  };
 
-  const handleSend = async () => {
+  c  const handleSend = async () => {
     const text = input.trim();
     if (!text || isTyping || !conversationId) return;
-
     if (usage.tier === 'free' && usage.limit !== null && usage.used >= usage.limit) {
       setShowUpgradeModal(true);
       return;
     }
-
     const userMessage: Message = {
       id: `user-${Date.now()}`,
       role: 'user',
       content: text,
     };
+    const assistantMessageId = `resp-${Date.now()}`;
     const currentMessages = [...messages, userMessage];
-    setMessages(currentMessages);
+    setMessages([...currentMessages, { id: assistantMessageId, role: 'assistant', content: '' }]);
     setInput('');
     setIsTyping(true);
-
     if (inputRef.current) inputRef.current.style.height = 'auto';
-
     try {
-      const { data, error } = await supabase.functions.invoke('bible-chat', {
-        body: {
+      const { data: { session } } = await supabase.auth.getSession();
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/bible-chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`,
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({
           messages: currentMessages.map(m => ({ role: m.role, content: m.content })),
           conversation_id: conversationId,
-        },
+        }),
       });
 
-      if (error) throw error;
+      if (!response.ok) throw new Error('Failed to get response');
 
-      const assistantMessage: Message = {
-        id: `resp-${Date.now()}`,
-        role: 'assistant',
-        content: data.content,
-      };
-
-      setMessages((prev) => [...prev, assistantMessage]);
-      if (data.usage) setUsage(data.usage);
+      let fullContent = '';
+      const reader = response.body?.getReader();
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const chunk = new TextDecoder().decode(value);
+          fullContent += chunk;
+          setMessages((prev) =>
+            prev.map((m) => m.id === assistantMessageId ? { ...m, content: fullContent } : m)
+          );
+        }
+      }
     } catch (err) {
       console.error('Chat error:', err);
+      setMessages((prev) =>
+        prev.map((m) => m.id === assistantMessageId ? { ...m, content: 'Error: Unable to process your request. Please try again.' } : m)
+      );
     } finally {
       setIsTyping(false);
     }
-  };
+  };  };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
