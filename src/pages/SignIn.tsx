@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { Mail, Lock, Loader2, ArrowRight, Cross, Eye, EyeOff, Sparkles, Shield, BookOpen } from 'lucide-react';
+import { Mail, Lock, Loader2, ArrowRight, Cross, Eye, EyeOff, Sparkles, Shield, BookOpen, AtSign } from 'lucide-react';
 import { trackEvent } from '../lib/analytics';
 
 const FEATURE_HIGHLIGHTS = [
@@ -17,7 +17,7 @@ const SCRIPTURE_QUOTE = {
 
 export default function SignIn() {
   const navigate = useNavigate();
-  const [email, setEmail] = useState('');
+  const [loginInput, setLoginInput] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -28,11 +28,26 @@ export default function SignIn() {
     e.preventDefault();
     setError('');
     setLoading(true);
-    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+    let resolvedEmail = loginInput.trim();
+    // If input doesn't look like an email, treat as username
+    if (!resolvedEmail.includes('@')) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('email')
+        .eq('username', resolvedEmail.toLowerCase())
+        .maybeSingle();
+      if (!profile?.email) {
+        setError('No account found with that username.');
+        setLoading(false);
+        return;
+      }
+      resolvedEmail = profile.email;
+    }
+    const { error: signInError } = await supabase.auth.signInWithPassword({ email: resolvedEmail, password });
     if (signInError) {
       setError(
         signInError.message === 'Invalid login credentials'
-          ? 'Incorrect email or password. Please try again.'
+          ? 'Incorrect email/username or password. Please try again.'
           : signInError.message
       );
       setLoading(false);
@@ -162,7 +177,7 @@ export default function SignIn() {
               </div>
               <div className="relative flex justify-center">
                 <span className="bg-[#020617] px-4 text-[10px] font-black uppercase tracking-[0.3em] text-navy-600">
-                  Or sign in with email
+                  Or sign in with email or username
                 </span>
               </div>
             </div>
@@ -179,17 +194,21 @@ export default function SignIn() {
 
               <div className="space-y-4">
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-navy-500 uppercase tracking-widest">Email Address</label>
+                  <label className="text-[10px] font-black text-navy-500 uppercase tracking-widest">Email or Username</label>
                   <div className="relative group">
-                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-navy-600 group-focus-within:text-gold-400 transition-colors" />
+                    {loginInput.includes('@') ? (
+                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-navy-600 group-focus-within:text-gold-400 transition-colors" />
+                    ) : (
+                      <AtSign className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-navy-600 group-focus-within:text-gold-400 transition-colors" />
+                    )}
                     <input
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      type="text"
+                      value={loginInput}
+                      onChange={(e) => setLoginInput(e.target.value)}
                       required
-                      autoComplete="email"
+                      autoComplete="username"
                       className="w-full bg-white/[0.03] border border-white/8 rounded-2xl pl-12 pr-5 py-4 text-sm text-white placeholder:text-navy-700 focus:outline-none focus:border-gold-400/40 focus:bg-white/[0.05] transition-all"
-                      placeholder="name@example.com"
+                      placeholder="name@example.com or your_username"
                     />
                   </div>
                 </div>
@@ -242,9 +261,9 @@ export default function SignIn() {
 
             <p className="text-center text-[11px] text-navy-600">
               By signing in, you agree to our{' '}
-              <Link to="/terms" className="text-navy-400 hover:text-white transition-colors">Terms</Link>
+              <Link to="/terms" className="text-gold-400/70 hover:text-gold-400 transition-colors">Terms</Link>
               {' '}and{' '}
-              <Link to="/privacy" className="text-navy-400 hover:text-white transition-colors">Privacy Policy</Link>
+              <Link to="/privacy" className="text-gold-400/70 hover:text-gold-400 transition-colors">Privacy Policy</Link>
             </p>
           </div>
         </div>

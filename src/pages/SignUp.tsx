@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { Mail, Lock, Loader2, ArrowRight, User, CheckCircle2, Cross, Eye, EyeOff, Sparkles, Heart, BookOpen } from 'lucide-react';
+import { Mail, Lock, Loader2, ArrowRight, User, CheckCircle2, Cross, Eye, EyeOff, Sparkles, Heart, BookOpen, AtSign, AlertCircle } from 'lucide-react';
 import { trackEvent } from '../lib/analytics';
 
 const SOCIAL_PROOF = [
@@ -15,7 +15,11 @@ export default function SignUp() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
+  const [username, setUsername] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState('');
@@ -33,33 +37,39 @@ export default function SignUp() {
 
   const strengthLabel = ['', 'Weak', 'Fair', 'Good', 'Strong'][passwordStrength];
   const strengthColor = ['', 'bg-red-400', 'bg-amber-400', 'bg-blue-400', 'bg-emerald-400'][passwordStrength];
+  const strengthTextColor = ['', 'text-red-400', 'text-amber-400', 'text-blue-400', 'text-emerald-400'][passwordStrength];
+
+  const validateUsername = (u: string) => /^[a-zA-Z0-9_]{3,20}$/.test(u);
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters.');
-      return;
-    }
+    if (!fullName.trim()) { setError('Please enter your full name.'); return; }
+    if (!validateUsername(username)) { setError('Username must be 3–20 characters: letters, numbers, underscores only.'); return; }
+    if (passwordStrength < 2) { setError('Password is too weak. Use at least 8 characters with letters and numbers.'); return; }
+    if (password !== confirmPassword) { setError('Passwords do not match.'); return; }
+    if (!agreedToTerms) { setError('You must agree to the Terms of Service and Privacy Policy.'); return; }
     setLoading(true);
-    const { data, error: signUpError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { full_name: fullName },
-        emailRedirectTo: `${window.location.origin}/email-confirmed`,
-      },
-    });
-    if (signUpError) {
-      setError(signUpError.message);
-      setLoading(false);
-      return;
-    }
-    if (data?.user) {
-      trackEvent('signup_success');
-      setSuccess(true);
-    }
-    setLoading(false);
+    try {
+      const { data: existing } = await supabase.from('profiles').select('id').eq('username', username.toLowerCase()).maybeSingle();
+      if (existing) { setError('That username is already taken.'); setLoading(false); return; }
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: { full_name: fullName, username: username.toLowerCase() },
+          emailRedirectTo: `${window.location.origin}/email-confirmed`,
+        },
+      });
+      if (signUpError) { setError(signUpError.message); setLoading(false); return; }
+      if (data?.user) {
+        await new Promise(r => setTimeout(r, 800));
+        await supabase.from('profiles').update({ username: username.toLowerCase(), full_name: fullName }).eq('id', data.user.id);
+        trackEvent('signup_success');
+        setSuccess(true);
+      }
+    } catch { setError('Something went wrong. Please try again.'); }
+    finally { setLoading(false); }
   };
 
   const handleGoogleSignUp = async () => {
@@ -242,7 +252,7 @@ export default function SignUp() {
 
               <div className="space-y-4">
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-navy-500 uppercase tracking-widest">Full Name</label>
+                  <label className="text-[10px] font-black text-navy-500 uppercase tracking-widest">Full Name <span className="text-navy-600 normal-case">(kept private)</span></label>
                   <div className="relative group">
                     <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-navy-600 group-focus-within:text-gold-400 transition-colors" />
                     <input
@@ -252,7 +262,24 @@ export default function SignUp() {
                       required
                       autoComplete="name"
                       className="w-full bg-white/[0.03] border border-white/8 rounded-2xl pl-12 pr-5 py-4 text-sm text-white placeholder:text-navy-700 focus:outline-none focus:border-gold-400/40 focus:bg-white/[0.05] transition-all"
-                      placeholder="Your name"
+                      placeholder="Your real name (never shown publicly)"
+                    />
+                  </div>
+                </div>
+                {/* Username */}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-navy-500 uppercase tracking-widest">Username <span className="text-navy-600 normal-case">(public)</span></label>
+                  <div className="relative group">
+                    <AtSign className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-navy-600 group-focus-within:text-gold-400 transition-colors" />
+                    <input
+                      type="text"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value.replace(/[^a-zA-Z0-9_]/g, ''))}
+                      required
+                      autoComplete="username"
+                      maxLength={20}
+                      className="w-full bg-white/[0.03] border border-white/8 rounded-2xl pl-12 pr-5 py-4 text-sm text-white placeholder:text-navy-700 focus:outline-none focus:border-gold-400/40 focus:bg-white/[0.05] transition-all"
+                      placeholder="your_username (3–20 chars)"
                     />
                   </div>
                 </div>
@@ -308,17 +335,58 @@ export default function SignUp() {
                         ))}
                       </div>
                       <p className="text-[10px] font-bold text-navy-500">
-                        Password strength: <span className={`${['', 'text-red-400', 'text-amber-400', 'text-blue-400', 'text-emerald-400'][passwordStrength]}`}>{strengthLabel}</span>
+                        Strength: <span className={strengthTextColor}>{strengthLabel}</span>
                       </p>
                     </div>
                   )}
                 </div>
+                {/* Confirm Password */}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-navy-500 uppercase tracking-widest">Confirm Password</label>
+                  <div className="relative group">
+                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-navy-600 group-focus-within:text-gold-400 transition-colors" />
+                    <input
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      required
+                      autoComplete="new-password"
+                      className={`w-full bg-white/[0.03] border rounded-2xl pl-12 pr-12 py-4 text-sm text-white placeholder:text-navy-700 focus:outline-none focus:bg-white/[0.05] transition-all ${
+                        confirmPassword && password !== confirmPassword ? 'border-red-500/40 focus:border-red-500/60' :
+                        confirmPassword && password === confirmPassword ? 'border-emerald-500/40 focus:border-emerald-500/60' :
+                        'border-white/8 focus:border-gold-400/40'
+                      }`}
+                      placeholder="Re-enter your password"
+                    />
+                    <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-navy-600 hover:text-navy-300 transition-colors">
+                      {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  {confirmPassword && password !== confirmPassword && (
+                    <p className="text-[10px] font-bold text-red-400 ml-1 animate-slide-up-fade">Passwords do not match</p>
+                  )}
+                </div>
               </div>
 
+              {/* Terms Agreement */}
+              <label className="flex items-start gap-3 cursor-pointer group">
+                <div className={`w-5 h-5 rounded-md border flex-shrink-0 mt-0.5 flex items-center justify-center transition-all ${
+                  agreedToTerms ? 'bg-gold-400 border-gold-400' : 'border-white/20 bg-white/5 group-hover:border-gold-400/40'
+                }`} onClick={() => setAgreedToTerms(!agreedToTerms)}>
+                  {agreedToTerms && <span className="text-navy-950 text-[10px] font-black">✓</span>}
+                </div>
+                <input type="checkbox" checked={agreedToTerms} onChange={(e) => setAgreedToTerms(e.target.checked)} className="sr-only" />
+                <span className="text-[11px] text-navy-400 leading-relaxed">
+                  I agree to the{' '}
+                  <Link to="/terms" className="text-gold-400 hover:text-gold-300 transition-colors font-semibold" target="_blank">Terms of Service</Link>
+                  {' '}and{' '}
+                  <Link to="/privacy" className="text-gold-400 hover:text-gold-300 transition-colors font-semibold" target="_blank">Privacy Policy</Link>
+                </span>
+              </label>
               <button
                 type="submit"
-                disabled={loading}
-                className="group relative w-full bg-gold-gradient text-navy-950 font-black py-4 rounded-2xl shadow-xl shadow-gold-400/15 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3 text-sm overflow-hidden disabled:opacity-50"
+                disabled={loading || !agreedToTerms}
+                className="group relative w-full bg-gold-gradient text-navy-950 font-black py-4 rounded-2xl shadow-xl shadow-gold-400/15 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3 text-sm overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                 {loading ? (
@@ -332,12 +400,7 @@ export default function SignUp() {
               </button>
             </form>
 
-            <p className="text-center text-[11px] text-navy-600">
-              By creating an account, you agree to our{' '}
-              <Link to="/terms" className="text-navy-400 hover:text-white transition-colors">Terms</Link>
-              {' '}and{' '}
-              <Link to="/privacy" className="text-navy-400 hover:text-white transition-colors">Privacy Policy</Link>
-            </p>
+
           </div>
         </div>
       </div>
