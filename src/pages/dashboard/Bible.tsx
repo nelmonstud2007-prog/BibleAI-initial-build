@@ -165,7 +165,10 @@ export default function Bible() {
         setVerses(data);
       } else {
         // Fallback to public API
-        const response = await fetch(`https://bible-api.com/${encodeURIComponent(book)}+${chapter}?translation=${trans.toLowerCase()}`);
+        // Map common translation names to bible-api.com supported ones
+        const apiTrans = trans.toLowerCase() === 'niv' ? 'web' : trans.toLowerCase();
+        const response = await fetch(`https://bible-api.com/${encodeURIComponent(book)}+${chapter}?translation=${apiTrans}`);
+        if (!response.ok) throw new Error('API response not ok');
         const apiData = await response.json();
         if (apiData.verses) {
           setVerses(apiData.verses.map((v: any) => ({
