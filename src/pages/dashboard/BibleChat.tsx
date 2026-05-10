@@ -19,7 +19,13 @@ import {
   Scroll,
   Heart,
   Landmark,
-  ChevronDown
+  ChevronDown,
+  Search,
+  Edit2,
+  Check,
+  Crown,
+  MessageCircle,
+  RotateCcw
 } from 'lucide-react';
 import UpgradeModal from '../../components/UpgradeModal';
 import { trackEvent } from '../../lib/analytics';
@@ -117,7 +123,6 @@ const formatMessageContent = (content: string, onVerseClick?: (ref: string) => v
   return result;
 };
 
-
 // ─── Main component ──────────────────────────────────────────────────────────
 
 export default function BibleChat() {
@@ -135,6 +140,11 @@ export default function BibleChat() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activePersona, setActivePersona] = useState<PersonaType>('scholar');
   const [showPersonaMenu, setShowPersonaMenu] = useState(false);
+
+  // Chat history sidebar
+  const [sidebarSearchQuery, setSidebarSearchQuery] = useState('');
+  const [renamingConversationId, setRenamingConversationId] = useState<string | null>(null);
+  const [renamingTitle, setRenamingTitle] = useState('');
 
   const [usage, setUsage] = useState<{ used: number; limit: number | null; tier: string }>({
     used: 0,
@@ -161,6 +171,35 @@ export default function BibleChat() {
   ];
 
   const currentPersona = PERSONAS.find(p => p.id === activePersona)!;
+  const usagePercent = usage.limit ? (usage.used / usage.limit) * 100 : 0;
+
+  // Group conversations by date
+  const filteredConversations = conversations.filter((c) =>
+    c.title.toLowerCase().includes(sidebarSearchQuery.toLowerCase())
+  );
+
+  const groupedConversations = {
+    today: filteredConversations.filter((c) => {
+      const date = new Date(c.updated_at);
+      const today = new Date();
+      return date.toDateString() === today.toDateString();
+    }),
+    yesterday: filteredConversations.filter((c) => {
+      const date = new Date(c.updated_at);
+      const yesterday = new Date(Date.now() - 86400000);
+      return date.toDateString() === yesterday.toDateString();
+    }),
+    thisWeek: filteredConversations.filter((c) => {
+      const date = new Date(c.updated_at);
+      const weekAgo = new Date(Date.now() - 604800000);
+      return date > weekAgo && date.toDateString() !== new Date().toDateString() && date.toDateString() !== new Date(Date.now() - 86400000).toDateString();
+    }),
+    older: filteredConversations.filter((c) => {
+      const date = new Date(c.updated_at);
+      const weekAgo = new Date(Date.now() - 604800000);
+      return date < weekAgo;
+    })
+  };
 
   useEffect(() => {
     const interval = setInterval(() => setPlaceholderIndex((p) => (p + 1) % placeholders.length), 4000);
@@ -201,6 +240,10 @@ export default function BibleChat() {
       fetchMessages(activeConversation.id);
     }
   }, [activeConversation?.id]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, isTyping]);
 
   const fetchConversations = async () => {
     if (!user) return;
@@ -264,6 +307,30 @@ export default function BibleChat() {
     }
   };
 
+  const renameConversation = async (id: string, newTitle: string) => {
+    if (!newTitle.trim()) return;
+    const { error } = await supabase
+      .from('chat_conversations')
+      .update({ title: newTitle })
+      .eq('id', id);
+    if (!error) {
+      setConversations((prev) => prev.map((c) => c.id === id ? { ...c, title: newTitle } : c));
+      setRenamingConversationId(null);
+      setRenamingTitle('');
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey && !isTyping && !isCooldownActive) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
+  const handleVerseClick = (ref: string) => {
+    navigate('/bible', { state: { verseReference: ref } });
+  };
+
   const handleSend = async () => {
     const text = input.trim();
     if (!text || isTyping || isCooldownActive) return;
@@ -312,288 +379,416 @@ export default function BibleChat() {
         setUsage((prev) => ({ ...prev, used: prev.limit ?? 5 }));
         setShowUpgradeModal(true);
         startCooldown(COOLDOWN_SECONDS);
+        setMessages((prev) => prev.filter((m) => m.id !== assistantMessageId));
         setIsTyping(false);
         return;
       }
 
-      if (!response.ok) throw new Error('AI failed');
+      if (!response.ok) throw new Error('Failed to get response');
 
       const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
+      if (!reader) throw new Error('No response body');
+
       let fullContent = '';
-
-      if (reader) {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          const chunk = decoder.decode(value);
-          const lines = chunk.split('\n');
-
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              const data = line.slice(6);
-              if (data === '[DONE]') continue;
-
-              try {
-                const parsed = JSON.parse(data);
-                if (parsed.delta) {
-                  fullContent += parsed.delta;
-                  setMessages((prev) => 
-                    prev.map((m) => m.id === assistantMessageId ? { ...m, content: fullContent } : m)
-                  );
-                }
-              } catch (e) {
-                // Partial chunk
-              }
-            }
-          }
-        }
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = new TextDecoder().decode(value);
+        fullContent += chunk;
+        setMessages((prev) =>
+          prev.map((m) => m.id === assistantMessageId ? { ...m, content: fullContent } : m)
+        );
       }
 
-      // Update conversation title if first message
-      if (messages.length === 0 && conversationId) {
-        const title = text.length > 40 ? text.slice(0, 40) + '...' : text;
-        await supabase.from('chat_conversations').update({ title }).eq('id', conversationId);
-        setConversations((prev) => prev.map((c) => (c.id === conversationId ? { ...c, title } : c)));
-      }
+      setMessages((prev) =>
+        prev.map((m) => m.id === assistantMessageId ? { ...m, created_at: new Date().toISOString() } : m)
+      );
       
-      fetchUsage(); // Refresh usage after message completion
+      fetchUsage();
     } catch (error) {
-      console.error('Streaming error:', error);
-      setMessages((prev) => prev.map((m) => m.id === assistantMessageId ? { ...m, content: 'I apologize, but I encountered an error. Please try again.' } : m));
+      console.error('Error sending message:', error);
+      setMessages((prev) => prev.filter((m) => m.id !== assistantMessageId));
     } finally {
       setIsTyping(false);
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
-  };
-
-  const handleVerseClick = (reference: string) => {
-    const match = reference.match(/^((?:\d\s+)?[A-Z][a-z]+)\s+(\d+):(\d+)/);
-    if (match) {
-      navigate('/dashboard/bible', { state: { jumpTo: { book: match[1], chapter: parseInt(match[2]), verse: parseInt(match[3]) } } });
-    }
-  };
-
-  const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, []);
-
-  useEffect(() => { scrollToBottom(); }, [messages, isTyping, scrollToBottom]);
-
-  const usagePercent = usage.limit !== null ? Math.min((usage.used / usage.limit) * 100, 100) : 0;
-
   return (
-    <div className="flex h-screen overflow-hidden bg-navy-950">
-      <UpgradeModal open={showUpgradeModal} onClose={() => setShowUpgradeModal(false)} limitType="ai_messages" />
+    <div className="flex h-screen bg-navy-950">
+      {/* Sidebar Overlay */}
+      {sidebarOpen && (
+        <div onClick={() => setSidebarOpen(false)} className="fixed inset-0 bg-black/50 z-30 lg:hidden" />
+      )}
 
-      {/* ── Sidebar ── */}
-      <aside className={`fixed lg:static inset-y-0 left-0 z-50 w-80 bg-navy-900 border-r border-white/5 flex flex-col transform transition-transform duration-300 lg:transform-none ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
-        <div className="p-6 border-b border-white/5">
-           <button onClick={() => { setActiveConversation(null); setMessages([]); setSidebarOpen(false); }} className="w-full bg-gold-gradient text-navy-950 font-black px-6 py-4 rounded-2xl shadow-xl shadow-gold-400/10 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3 uppercase tracking-widest text-xs">
-             <Plus className="w-5 h-5" />
-             New Journey
-           </button>
+      {/* Sidebar */}
+      <aside className={`fixed lg:relative w-80 h-screen bg-navy-950 border-r border-white/5 z-40 transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'} overflow-y-auto scrollbar-none flex flex-col`}>
+        {/* Header */}
+        <div className="p-6 border-b border-white/5 space-y-4 flex-shrink-0">
+          <div className="flex items-center justify-between">
+            <h1 className="text-lg font-black text-white uppercase tracking-wider">Conversations</h1>
+            <button onClick={() => setSidebarOpen(false)} className="lg:hidden text-navy-400 hover:text-white transition-colors">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          <button onClick={createConversation} className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gold-400 text-navy-950 font-bold rounded-xl hover:bg-gold-300 transition-all active:scale-95">
+            <Plus className="w-4 h-4" /> New Chat
+          </button>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-navy-600" />
+            <input
+              type="text"
+              placeholder="Search conversations..."
+              value={sidebarSearchQuery}
+              onChange={(e) => setSidebarSearchQuery(e.target.value)}
+              className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-2 text-sm text-white placeholder:text-navy-700 focus:outline-none focus:border-gold-400/40 transition-all"
+            />
+          </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-2 scrollbar-none">
+        {/* Conversations List */}
+        <div className="flex-1 overflow-y-auto scrollbar-none p-4 space-y-6">
           {loadingConversations ? (
-            <div className="flex flex-col items-center justify-center py-20 gap-3">
-               <Loader2 className="w-6 h-6 animate-spin text-gold-400" />
-               <p className="text-[10px] font-black text-navy-600 uppercase tracking-widest">Opening History</p>
+            <div className="flex items-center justify-center h-20">
+              <Loader2 className="w-5 h-5 animate-spin text-gold-400" />
             </div>
           ) : conversations.length === 0 ? (
-            <div className="text-center py-20 px-6 space-y-4">
-               <div className="w-16 h-16 bg-navy-950/50 rounded-full flex items-center justify-center mx-auto border border-white/5 shadow-inner">
-                  <MessageSquare className="w-6 h-6 text-navy-700" />
-               </div>
-               <p className="text-[10px] font-black text-navy-500 uppercase tracking-[0.2em] italic">Your journey begins with a single question.</p>
-            </div>
+            <div className="text-center py-8 text-navy-500 text-sm">No conversations yet</div>
           ) : (
-            conversations.map((conv) => (
-              <div key={conv.id} onClick={() => { setActiveConversation(conv); setSidebarOpen(false); }} className={`group p-4 rounded-2xl cursor-pointer transition-all border ${activeConversation?.id === conv.id ? 'bg-white/5 border-white/10 text-white' : 'text-navy-500 border-transparent hover:bg-white/5 hover:text-navy-200'}`}>
-                <div className="flex items-center gap-3">
-                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${activeConversation?.id === conv.id ? 'bg-gold-400/10 text-gold-400' : 'bg-navy-950/50 text-navy-700 group-hover:text-navy-400'}`}>
-                      <Scroll className="w-5 h-5" />
-                   </div>
-                   <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold truncate">{conv.title}</p>
-                      <p className="text-[9px] font-black uppercase tracking-widest text-navy-600 mt-0.5">{new Date(conv.updated_at).toLocaleDateString()}</p>
-                   </div>
-                   <button onClick={(e) => { e.stopPropagation(); deleteConversation(conv.id); }} className="opacity-0 group-hover:opacity-100 p-2 text-navy-600 hover:text-red-400 transition-all">
-                      <Trash2 className="w-4 h-4" />
-                   </button>
+            <>
+              {groupedConversations.today.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-bold text-navy-600 uppercase tracking-widest px-2">Today</p>
+                  {groupedConversations.today.map((c) => (
+                    <ConversationItem
+                      key={c.id}
+                      conversation={c}
+                      isActive={activeConversation?.id === c.id}
+                      onSelect={() => { setActiveConversation(c); setSidebarOpen(false); }}
+                      onDelete={() => deleteConversation(c.id)}
+                      onRename={() => { setRenamingConversationId(c.id); setRenamingTitle(c.title); }}
+                      isRenaming={renamingConversationId === c.id}
+                      renamingTitle={renamingTitle}
+                      onRenamingTitleChange={setRenamingTitle}
+                      onRenamingSubmit={() => renameConversation(c.id, renamingTitle)}
+                      onRenamingCancel={() => setRenamingConversationId(null)}
+                    />
+                  ))}
                 </div>
-              </div>
-            ))
+              )}
+              {groupedConversations.yesterday.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-bold text-navy-600 uppercase tracking-widest px-2">Yesterday</p>
+                  {groupedConversations.yesterday.map((c) => (
+                    <ConversationItem
+                      key={c.id}
+                      conversation={c}
+                      isActive={activeConversation?.id === c.id}
+                      onSelect={() => { setActiveConversation(c); setSidebarOpen(false); }}
+                      onDelete={() => deleteConversation(c.id)}
+                      onRename={() => { setRenamingConversationId(c.id); setRenamingTitle(c.title); }}
+                      isRenaming={renamingConversationId === c.id}
+                      renamingTitle={renamingTitle}
+                      onRenamingTitleChange={setRenamingTitle}
+                      onRenamingSubmit={() => renameConversation(c.id, renamingTitle)}
+                      onRenamingCancel={() => setRenamingConversationId(null)}
+                    />
+                  ))}
+                </div>
+              )}
+              {groupedConversations.thisWeek.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-bold text-navy-600 uppercase tracking-widest px-2">This Week</p>
+                  {groupedConversations.thisWeek.map((c) => (
+                    <ConversationItem
+                      key={c.id}
+                      conversation={c}
+                      isActive={activeConversation?.id === c.id}
+                      onSelect={() => { setActiveConversation(c); setSidebarOpen(false); }}
+                      onDelete={() => deleteConversation(c.id)}
+                      onRename={() => { setRenamingConversationId(c.id); setRenamingTitle(c.title); }}
+                      isRenaming={renamingConversationId === c.id}
+                      renamingTitle={renamingTitle}
+                      onRenamingTitleChange={setRenamingTitle}
+                      onRenamingSubmit={() => renameConversation(c.id, renamingTitle)}
+                      onRenamingCancel={() => setRenamingConversationId(null)}
+                    />
+                  ))}
+                </div>
+              )}
+              {groupedConversations.older.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-bold text-navy-600 uppercase tracking-widest px-2">Older</p>
+                  {groupedConversations.older.map((c) => (
+                    <ConversationItem
+                      key={c.id}
+                      conversation={c}
+                      isActive={activeConversation?.id === c.id}
+                      onSelect={() => { setActiveConversation(c); setSidebarOpen(false); }}
+                      onDelete={() => deleteConversation(c.id)}
+                      onRename={() => { setRenamingConversationId(c.id); setRenamingTitle(c.title); }}
+                      isRenaming={renamingConversationId === c.id}
+                      renamingTitle={renamingTitle}
+                      onRenamingTitleChange={setRenamingTitle}
+                      onRenamingSubmit={() => renameConversation(c.id, renamingTitle)}
+                      onRenamingCancel={() => setRenamingConversationId(null)}
+                    />
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </div>
 
         {/* Usage Section */}
-        <div className="p-6 border-t border-white/5 bg-navy-950/50">
-           {!isPro ? (
-             <div className="space-y-4">
-                <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest">
-                   <span className="text-navy-500">Daily Presence</span>
-                   <span className="text-gold-400">{usage.used}/{usage.limit} Used</span>
-                </div>
-                <div className="h-1.5 w-full bg-navy-900 rounded-full overflow-hidden">
-                   <div className="h-full bg-gold-gradient transition-all duration-1000" style={{ width: `${usagePercent}%` }} />
-                </div>
-                <button onClick={() => setShowUpgradeModal(true)} className="w-full text-[10px] font-black uppercase tracking-[0.2em] text-gold-400 hover:text-white transition-colors py-2">
-                   Upgrade to Unlimited
-                </button>
-             </div>
-           ) : (
-             <div className="flex items-center gap-4 bg-gold-400/5 border border-gold-400/10 p-4 rounded-2xl">
-                <div className="w-10 h-10 bg-gold-gradient rounded-xl flex items-center justify-center shadow-lg shadow-gold-400/20">
-                   <Crown className="w-5 h-5 text-navy-950" />
-                </div>
-                <div>
-                   <p className="text-[10px] font-black text-white uppercase tracking-widest">Pro Disciple</p>
-                   <p className="text-[8px] font-black text-gold-400/70 uppercase tracking-[0.2em]">Unlimited Insights</p>
-                </div>
-             </div>
-           )}
+        <div className="p-6 border-t border-white/5 bg-navy-950/50 flex-shrink-0">
+          {!isPro ? (
+            <div className="space-y-4">
+              <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest">
+                <span className="text-navy-500">Daily Messages</span>
+                <span className="text-gold-400">{usage.used}/{usage.limit} Used</span>
+              </div>
+              <div className="h-1.5 w-full bg-navy-900 rounded-full overflow-hidden">
+                <div className="h-full bg-gold-gradient transition-all duration-1000" style={{ width: `${usagePercent}%` }} />
+              </div>
+              <button onClick={() => setShowUpgradeModal(true)} className="w-full text-[10px] font-black uppercase tracking-[0.2em] text-gold-400 hover:text-white transition-colors py-2">
+                Upgrade to Unlimited
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 text-gold-400 font-bold">
+              <Crown className="w-4 h-4" />
+              <span className="text-xs">Pro Unlimited</span>
+            </div>
+          )}
         </div>
       </aside>
 
-      {/* ── Main Chat ── */}
-      <div className="flex-1 flex flex-col min-w-0 bg-navy-950 relative overflow-hidden">
-        
-        {/* Header with Persona Selector */}
-        <header className="px-6 py-6 border-b border-white/5 bg-navy-950/80 backdrop-blur-2xl flex items-center justify-between z-30">
-           <div className="flex items-center gap-4">
-              <button onClick={() => setSidebarOpen(true)} className="lg:hidden text-navy-500 hover:text-white p-2">
-                 <ChevronLeft className="w-6 h-6" />
-              </button>
-              <div className="flex items-center gap-4">
-                 <div className={`w-12 h-12 ${currentPersona.bg} rounded-2xl flex items-center justify-center shadow-2xl relative group`}>
-                    <div className={`absolute inset-0 ${currentPersona.bg} blur-md opacity-50`} />
-                    <currentPersona.icon className={`w-6 h-6 ${currentPersona.color} relative z-10`} />
-                 </div>
-                 <div>
-                    <h1 className="text-xl font-black text-white tracking-tighter uppercase italic">{activeConversation?.title || 'Sanctuary Chat'}</h1>
-                    <div className="flex items-center gap-2">
-                       <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-                       <span className="text-[9px] font-black text-navy-500 uppercase tracking-[0.2em]">{currentPersona.name} &bull; Online</span>
-                    </div>
-                 </div>
+      {/* Main Chat Area */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Header */}
+        <header className="border-b border-white/5 bg-navy-950/50 backdrop-blur-md p-6 flex items-center justify-between flex-shrink-0">
+          <div className="flex items-center gap-4 flex-1">
+            <button onClick={() => setSidebarOpen(true)} className="lg:hidden text-navy-400 hover:text-white transition-colors">
+              <MessageCircle className="w-5 h-5" />
+            </button>
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 ${currentPersona.bg} rounded-xl flex items-center justify-center`}>
+                <currentPersona.icon className={`w-5 h-5 ${currentPersona.color}`} />
               </div>
-           </div>
+              <div>
+                <p className="text-sm font-bold text-white">{currentPersona.name}</p>
+                <p className="text-xs text-navy-400">{currentPersona.tagline}</p>
+              </div>
+            </div>
+          </div>
 
-           {/* Persona Switcher */}
-           <div className="relative">
-              <button onClick={() => setShowPersonaMenu(!showPersonaMenu)} className="flex items-center gap-3 bg-white/5 border border-white/10 px-4 py-2.5 rounded-2xl hover:bg-white/10 transition-all">
-                 <div className={`w-5 h-5 ${currentPersona.bg} rounded flex items-center justify-center`}>
-                    <currentPersona.icon className={`w-3 h-3 ${currentPersona.color}`} />
-                 </div>
-                 <span className="text-[10px] font-black text-white uppercase tracking-widest hidden sm:inline">{currentPersona.name}</span>
-                 <ChevronDown className={`w-4 h-4 text-navy-600 transition-transform ${showPersonaMenu ? 'rotate-180' : ''}`} />
-              </button>
-
-              {showPersonaMenu && (
-                <div className="absolute top-full right-0 mt-3 w-72 bg-navy-900 border border-white/10 rounded-[2rem] shadow-2xl p-3 animate-scale-in z-50">
-                   {PERSONAS.map(p => (
-                     <button key={p.id} onClick={() => { setActivePersona(p.id); setShowPersonaMenu(false); }} className={`w-full flex items-start gap-4 p-4 rounded-2xl transition-all mb-1 ${activePersona === p.id ? 'bg-white/5 border border-white/10' : 'hover:bg-white/5 border border-transparent'}`}>
-                        <div className={`w-10 h-10 ${p.bg} rounded-xl flex items-center justify-center flex-shrink-0`}>
-                           <p.icon className={`w-5 h-5 ${p.color}`} />
-                        </div>
-                        <div className="text-left min-w-0">
-                           <p className="text-xs font-black text-white uppercase tracking-widest">{p.name}</p>
-                           <p className="text-[9px] text-navy-500 font-medium leading-relaxed mt-1">{p.description}</p>
-                        </div>
-                     </button>
-                   ))}
-                </div>
-              )}
-           </div>
+          {/* Persona Selector */}
+          <div className="relative">
+            <button
+              onClick={() => setShowPersonaMenu(!showPersonaMenu)}
+              className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-xl hover:border-gold-400/40 transition-all"
+            >
+              <span className="text-xs font-bold text-white uppercase tracking-wider">Change</span>
+              <ChevronDown className={`w-4 h-4 text-navy-400 transition-transform ${showPersonaMenu ? 'rotate-180' : ''}`} />
+            </button>
+            {showPersonaMenu && (
+              <div className="absolute top-full right-0 mt-2 w-96 bg-navy-950 border border-white/10 rounded-2xl p-4 shadow-2xl z-50">
+                {PERSONAS.map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => { setActivePersona(p.id); setShowPersonaMenu(false); }}
+                    className={`w-full flex items-start gap-4 p-4 rounded-2xl transition-all mb-1 ${activePersona === p.id ? 'bg-white/5 border border-white/10' : 'hover:bg-white/5 border border-transparent'}`}
+                  >
+                    <div className={`w-10 h-10 ${p.bg} rounded-xl flex items-center justify-center flex-shrink-0`}>
+                      <p.icon className={`w-5 h-5 ${p.color}`} />
+                    </div>
+                    <div className="text-left min-w-0">
+                      <p className="text-xs font-black text-white uppercase tracking-widest">{p.name}</p>
+                      <p className="text-[9px] text-navy-500 font-medium leading-relaxed mt-1">{p.description}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </header>
 
-        {/* Messages */}
+        {/* Messages Container - Fixed Height with Scroll */}
         <div className="flex-1 overflow-y-auto scrollbar-none pb-40 lg:pb-12 px-6 sm:px-12 py-10">
-           {messages.length === 0 && !loadingMessages ? (
-             <div className="max-w-3xl mx-auto text-center space-y-12 py-20">
-                <div className="w-24 h-24 bg-white/2 border border-white/5 rounded-[2.5rem] flex items-center justify-center mx-auto animate-float shadow-2xl">
-                   <Sparkles className="w-10 h-10 text-gold-400" />
-                </div>
-                <div className="space-y-4">
-                   <h2 className="text-4xl sm:text-5xl font-black text-white tracking-tighter uppercase italic">Seek & Find</h2>
-                   <p className="text-navy-400 text-lg max-w-xl mx-auto">Your personal sanctuary for biblical exploration. Ask about life, faith, or the deep mysteries of the Word.</p>
-                </div>
-                <div className="grid sm:grid-cols-2 gap-4 text-left">
-                   {[
-                     'What does the Bible say about finding peace?',
-                     'How do I stay strong in difficult times?',
-                     'Explain the concept of Divine Grace',
-                     'Give me a morning prayer for my family'
-                   ].map((q, i) => (
-                     <button key={i} onClick={() => setInput(q)} className="p-6 bg-navy-900/40 border border-white/5 rounded-[2rem] hover:border-gold-400/30 transition-all group flex items-center justify-between">
-                        <span className="text-xs font-black text-navy-300 group-hover:text-white uppercase tracking-widest leading-relaxed flex-1">{q}</span>
-                        <ChevronRight className="w-4 h-4 text-navy-700 group-hover:text-gold-400 group-hover:translate-x-1 transition-all" />
-                     </button>
-                   ))}
-                </div>
-             </div>
-           ) : (
-             <div className="max-w-4xl mx-auto space-y-12">
-                {messages.map((m, i) => (
-                  <div key={i} className={`flex gap-6 animate-slide-up-fade ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
-                     <div className={`w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-2xl transition-all ${m.role === 'user' ? 'bg-gold-gradient text-navy-950 font-black' : `${currentPersona.bg} border border-white/5`}`}>
-                        {m.role === 'user' ? user?.email?.[0]?.toUpperCase() : <currentPersona.icon className={`w-6 h-6 ${currentPersona.color}`} />}
-                     </div>
-                     <div className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'} max-w-[85%] sm:max-w-[75%]`}>
-                        <div className={`p-6 rounded-[2.5rem] text-[15px] leading-relaxed shadow-2xl transition-all ${m.role === 'user' ? 'bg-navy-800 border border-navy-700 text-white rounded-tr-none' : 'bg-navy-900/60 backdrop-blur-md border border-white/5 text-navy-100 rounded-tl-none'}`}>
-                           <div className="whitespace-pre-wrap">{m.role === 'assistant' ? formatMessageContent(m.content, handleVerseClick) : m.content}</div>
-                        </div>
-                        <div className="flex items-center gap-2 mt-3 px-4">
-                           <span className="text-[9px] font-black text-navy-600 uppercase tracking-widest">{m.role === 'user' ? 'Disciple' : currentPersona.name}</span>
-                           <span className="w-1 h-1 bg-navy-800 rounded-full" />
-                           <span className="text-[9px] font-black text-navy-700 uppercase tracking-widest">{m.created_at ? new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Now'}</span>
-                        </div>
-                     </div>
-                  </div>
+          {messages.length === 0 && !loadingMessages ? (
+            <div className="max-w-3xl mx-auto text-center space-y-12 py-20">
+              <div className="w-24 h-24 bg-white/2 border border-white/5 rounded-[2.5rem] flex items-center justify-center mx-auto animate-float shadow-2xl">
+                <Sparkles className="w-10 h-10 text-gold-400" />
+              </div>
+              <div className="space-y-4">
+                <h2 className="text-4xl sm:text-5xl font-black text-white tracking-tighter uppercase italic">Seek & Find</h2>
+                <p className="text-navy-400 text-lg max-w-xl mx-auto">Your personal sanctuary for biblical exploration. Ask about life, faith, or the deep mysteries of the Word.</p>
+              </div>
+              <div className="grid sm:grid-cols-2 gap-4 text-left">
+                {[
+                  'What does the Bible say about finding peace?',
+                  'How do I stay strong in difficult times?',
+                  'Explain the concept of Divine Grace',
+                  'Give me a morning prayer for my family'
+                ].map((q, i) => (
+                  <button key={i} onClick={() => setInput(q)} className="p-6 bg-navy-900/40 border border-white/5 rounded-[2rem] hover:border-gold-400/30 transition-all group flex items-center justify-between">
+                    <span className="text-xs font-black text-navy-300 group-hover:text-white uppercase tracking-widest leading-relaxed flex-1">{q}</span>
+                    <ChevronRight className="w-4 h-4 text-navy-700 group-hover:text-gold-400 group-hover:translate-x-1 transition-all" />
+                  </button>
                 ))}
-                {isTyping && (
-                  <div className="flex gap-6 animate-slide-up-fade">
-                     <div className={`w-12 h-12 ${currentPersona.bg} border border-white/5 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-2xl`}>
-                        <Loader2 className={`w-6 h-6 animate-spin ${currentPersona.color}`} />
-                     </div>
-                     <div className="bg-navy-900/40 backdrop-blur-md border border-white/5 rounded-[2.5rem] px-8 py-5 rounded-tl-none shadow-2xl flex gap-2">
-                        {[1, 2, 3].map(j => <div key={j} className={`w-2 h-2 ${currentPersona.bg.replace('/10', '/40')} rounded-full animate-pulse`} style={{ animationDelay: `${j * 0.2}s` }} />)}
-                     </div>
+              </div>
+            </div>
+          ) : (
+            <div className="max-w-4xl mx-auto space-y-12">
+              {messages.map((m, i) => (
+                <div key={i} className={`flex gap-6 animate-slide-up-fade ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
+                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-2xl transition-all ${m.role === 'user' ? 'bg-gold-gradient text-navy-950 font-black' : `${currentPersona.bg} border border-white/5`}`}>
+                    {m.role === 'user' ? user?.email?.[0]?.toUpperCase() : <currentPersona.icon className={`w-6 h-6 ${currentPersona.color}`} />}
                   </div>
-                )}
-                <div ref={messagesEndRef} />
-             </div>
-           )}
-        </div>
-
-        {/* Input */}
-        <div className="fixed lg:absolute bottom-0 left-0 right-0 p-6 sm:p-10 bg-gradient-to-t from-navy-950 via-navy-950/90 to-transparent z-30">
-           <div className="max-w-4xl mx-auto space-y-4">
-              {isCooldownActive && (
-                <div className="bg-amber-400/10 border border-amber-400/20 rounded-2xl p-4 flex items-center justify-between animate-slide-up-fade">
-                   <div className="flex items-center gap-3">
-                      <Clock className="w-4 h-4 text-amber-500 animate-pulse" />
-                      <p className="text-[10px] font-black text-amber-400 uppercase tracking-[0.2em]">Presence Cooldown: {formatCountdown(cooldownRemaining)}</p>
-                   </div>
-                   <button onClick={() => setShowUpgradeModal(true)} className="text-[10px] font-black text-white uppercase tracking-widest bg-amber-500 px-4 py-2 rounded-xl">Unlock Pro</button>
+                  <div className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'} max-w-[85%] sm:max-w-[75%]`}>
+                    <div className={`p-6 rounded-[2.5rem] text-[15px] leading-relaxed shadow-2xl transition-all ${m.role === 'user' ? 'bg-navy-800 border border-navy-700 text-white rounded-tr-none' : 'bg-navy-900/60 backdrop-blur-md border border-white/5 text-navy-100 rounded-tl-none'}`}>
+                      <div className="whitespace-pre-wrap">{m.role === 'assistant' ? formatMessageContent(m.content, handleVerseClick) : m.content}</div>
+                    </div>
+                    <div className="flex items-center gap-2 mt-3 px-4">
+                      <span className="text-[9px] font-black text-navy-600 uppercase tracking-widest">{m.role === 'user' ? 'You' : currentPersona.name}</span>
+                      <span className="w-1 h-1 bg-navy-800 rounded-full" />
+                      <span className="text-[9px] font-black text-navy-700 uppercase tracking-widest">{m.created_at ? new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Now'}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {isTyping && (
+                <div className="flex gap-6 animate-slide-up-fade">
+                  <div className={`w-12 h-12 ${currentPersona.bg} border border-white/5 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-2xl`}>
+                    <Loader2 className={`w-6 h-6 animate-spin ${currentPersona.color}`} />
+                  </div>
+                  <div className="bg-navy-900/40 backdrop-blur-md border border-white/5 rounded-[2.5rem] px-8 py-5 rounded-tl-none shadow-2xl flex gap-2">
+                    {[1, 2, 3].map(j => <div key={j} className={`w-2 h-2 ${currentPersona.bg.replace('/10', '/40')} rounded-full animate-pulse`} style={{ animationDelay: `${j * 0.2}s` }} />)}
+                  </div>
                 </div>
               )}
-              <div className={`bg-navy-900/80 backdrop-blur-3xl border-2 rounded-[2.5rem] p-3 transition-all flex items-end gap-4 shadow-2xl ${isCooldownActive ? 'border-amber-500/20 opacity-50' : 'border-white/5 focus-within:border-gold-400/40'}`}>
-                 <textarea ref={inputRef} value={input} onChange={(e) => { setInput(e.target.value); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 160) + 'px'; }} onKeyDown={handleKeyDown} disabled={isTyping || isCooldownActive} placeholder={isCooldownActive ? 'Resting...' : placeholders[placeholderIndex]} className="flex-1 bg-transparent border-none focus:ring-0 text-white placeholder-navy-700 py-4 pl-6 text-sm resize-none scrollbar-none font-medium" rows={1} />
-                 <button onClick={handleSend} disabled={isTyping || isCooldownActive || !input.trim()} className={`w-14 h-14 rounded-full flex items-center justify-center transition-all shadow-xl ${input.trim() ? 'bg-gold-gradient text-navy-950 hover:scale-110 active:scale-95' : 'bg-navy-800 text-navy-700 cursor-not-allowed'}`}>
-                    <Send className="w-6 h-6" />
-                 </button>
+              <div ref={messagesEndRef} />
+            </div>
+          )}
+        </div>
+
+        {/* Input Bar - Pinned to Bottom */}
+        <div className="fixed lg:absolute bottom-0 left-0 right-0 p-6 sm:p-10 bg-gradient-to-t from-navy-950 via-navy-950/90 to-transparent z-30">
+          <div className="max-w-4xl mx-auto space-y-4">
+            {isCooldownActive && (
+              <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-4 flex items-center justify-between animate-slide-up-fade">
+                <div className="flex items-center gap-3">
+                  <Clock className="w-4 h-4 text-red-400 animate-pulse" />
+                  <div>
+                    <p className="text-xs font-black text-red-400 uppercase tracking-widest">Daily Limit Reached</p>
+                    <p className="text-[10px] text-red-300 mt-0.5">Chat unlocks in {formatCountdown(cooldownRemaining)}</p>
+                  </div>
+                </div>
+                <button onClick={() => setShowUpgradeModal(true)} className="flex items-center gap-2 text-xs font-black text-white uppercase tracking-widest bg-gold-400 hover:bg-gold-300 px-4 py-2 rounded-xl transition-all active:scale-95">
+                  <Crown className="w-3 h-3" /> Upgrade
+                </button>
               </div>
-              <p className="text-center text-[9px] font-black text-navy-600 uppercase tracking-[0.4em]">Guided by Wisdom &bull; Steeped in Grace</p>
-           </div>
+            )}
+            <div className={`bg-navy-900/80 backdrop-blur-3xl border-2 rounded-[2.5rem] p-3 transition-all flex items-end gap-4 shadow-2xl ${isCooldownActive ? 'border-red-500/20 opacity-50' : 'border-white/5 focus-within:border-gold-400/40'}`}>
+              <textarea
+                ref={inputRef}
+                value={input}
+                onChange={(e) => {
+                  setInput(e.target.value);
+                  e.target.style.height = 'auto';
+                  e.target.style.height = Math.min(e.target.scrollHeight, 160) + 'px';
+                }}
+                onKeyDown={handleKeyDown}
+                disabled={isTyping || isCooldownActive}
+                placeholder={isCooldownActive ? 'Resting...' : placeholders[placeholderIndex]}
+                className="flex-1 bg-transparent border-none focus:ring-0 text-white placeholder-navy-700 py-4 pl-6 text-sm resize-none scrollbar-none font-medium"
+                rows={1}
+              />
+              <button
+                onClick={handleSend}
+                disabled={isTyping || isCooldownActive || !input.trim()}
+                className={`w-14 h-14 rounded-full flex items-center justify-center transition-all shadow-xl ${input.trim() ? 'bg-gold-gradient text-navy-950 hover:scale-110 active:scale-95' : 'bg-navy-800 text-navy-700 cursor-not-allowed'}`}
+              >
+                <Send className="w-6 h-6" />
+              </button>
+            </div>
+            <p className="text-center text-[9px] font-black text-navy-600 uppercase tracking-[0.4em]">Guided by Wisdom • Steeped in Grace</p>
+          </div>
         </div>
       </div>
+
+      <UpgradeModal open={showUpgradeModal} onClose={() => setShowUpgradeModal(false)} />
+    </div>
+  );
+}
+
+// ─── Conversation Item Component ─────────────────────────────────────────────
+
+interface ConversationItemProps {
+  conversation: Conversation;
+  isActive: boolean;
+  onSelect: () => void;
+  onDelete: () => void;
+  onRename: () => void;
+  isRenaming: boolean;
+  renamingTitle: string;
+  onRenamingTitleChange: (title: string) => void;
+  onRenamingSubmit: () => void;
+  onRenamingCancel: () => void;
+}
+
+function ConversationItem({
+  conversation,
+  isActive,
+  onSelect,
+  onDelete,
+  onRename,
+  isRenaming,
+  renamingTitle,
+  onRenamingTitleChange,
+  onRenamingSubmit,
+  onRenamingCancel,
+}: ConversationItemProps) {
+  return (
+    <div className={`group p-3 rounded-xl transition-all ${isActive ? 'bg-gold-400/10 border border-gold-400/20' : 'hover:bg-white/5 border border-transparent'}`}>
+      {isRenaming ? (
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={renamingTitle}
+            onChange={(e) => onRenamingTitleChange(e.target.value)}
+            className="flex-1 bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-sm text-white focus:outline-none focus:border-gold-400/40"
+            autoFocus
+          />
+          <button onClick={onRenamingSubmit} className="p-1 hover:bg-emerald-400/20 rounded-lg transition-all">
+            <Check className="w-4 h-4 text-emerald-400" />
+          </button>
+          <button onClick={onRenamingCancel} className="p-1 hover:bg-red-400/20 rounded-lg transition-all">
+            <X className="w-4 h-4 text-red-400" />
+          </button>
+        </div>
+      ) : (
+        <>
+          <button onClick={onSelect} className="w-full text-left">
+            <p className="text-sm font-medium text-white truncate">{conversation.title}</p>
+            <p className="text-xs text-navy-500 mt-1">{new Date(conversation.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+          </button>
+          <div className="flex gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button
+              onClick={onRename}
+              className="flex-1 p-1 text-xs bg-white/5 hover:bg-gold-400/20 rounded-lg transition-all text-navy-400 hover:text-gold-400 flex items-center justify-center gap-1"
+            >
+              <Edit2 className="w-3 h-3" /> Rename
+            </button>
+            <button
+              onClick={onDelete}
+              className="flex-1 p-1 text-xs bg-white/5 hover:bg-red-400/20 rounded-lg transition-all text-navy-400 hover:text-red-400 flex items-center justify-center gap-1"
+            >
+              <Trash2 className="w-3 h-3" /> Delete
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }
