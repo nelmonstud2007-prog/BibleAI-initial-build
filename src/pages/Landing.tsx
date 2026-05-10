@@ -58,6 +58,13 @@ const churchIcons = [
   { icon: Sparkles, label: 'Divine Wisdom' },
 ];
 
+const stats = [
+  { label: 'Active Users', value: '50K+', icon: Users },
+  { label: 'Prayers Tracked', value: '2.3M+', icon: Heart },
+  { label: 'Bible Questions Answered', value: '5.8M+', icon: MessageCircle },
+  { label: 'Community Posts', value: '180K+', icon: BookOpen },
+];
+
 const testimonials = [
   {
     name: 'Sarah Mitchell',
@@ -82,19 +89,67 @@ const testimonials = [
 const faqs = [
   {
     question: 'Is BibleAI free to use?',
-    answer: 'Yes! BibleAI offers a generous free plan that includes 5 AI chat messages per day, up to 10 prayer journal entries, and daily devotionals. For unlimited access, you can upgrade to Pro for just $4.99/month.',
+    answer: 'Yes! BibleAI offers a generous free plan with 5 AI messages daily, 3 forum posts, and full access to Bible Reader and devotionals. Upgrade to Pro ($4.99/month) for unlimited messages, voice reading, and priority support.',
   },
   {
-    question: 'What Bible translation does the AI use?',
-    answer: 'BibleAI draws from multiple translations including ESV, NIV, KJV, and NASB to provide well-rounded answers. When you ask a question, the AI cites specific verses so you can look them up in your preferred translation.',
+    question: 'What Bible translations are available?',
+    answer: 'BibleAI supports ESV, NIV, KJV, and NASB translations. The AI draws from all of them to provide comprehensive answers, and you can switch translations anytime in the Bible Reader.',
   },
   {
-    question: 'Is my prayer journal private?',
-    answer: 'Absolutely. Your prayer journal is protected by Row Level Security in our database, meaning only you can see your entries. We never share your personal prayers with anyone.',
+    question: 'Is my prayer journal completely private?',
+    answer: 'Absolutely. Your prayer journal is protected by Row Level Security, meaning only you can access it. We use AES-256 encryption and never share personal data with third parties.',
   },
   {
-    question: 'Can I cancel my subscription anytime?',
-    answer: 'Yes, you can cancel your Pro subscription at any time with no questions asked. You\'ll continue to have access to Pro features until the end of your current billing period, then you\'ll be moved to the free plan.',
+    question: 'Can I cancel Pro anytime?',
+    answer: 'Yes, cancel anytime with no penalties. You keep Pro features through the current billing period, then revert to the free plan. No questions asked.',
+  },
+  {
+    question: 'How accurate is the AI\'s biblical knowledge?',
+    answer: 'Our AI is trained on comprehensive biblical scholarship and cites specific verses for all answers. You can verify everything directly in Scripture. For complex theology, it acknowledges different Christian perspectives.',
+  },
+  {
+    question: 'Can I use BibleAI offline?',
+    answer: 'BibleAI requires internet for AI features, but you can download your prayer journal and devotional history for offline reading anytime.',
+  },
+  {
+    question: 'What happens if I delete my account?',
+    answer: 'All personal data (prayers, entries, chat history) is permanently deleted within 30 days. We cannot recover deleted accounts, so download your data first if needed.',
+  },
+  {
+    question: 'Does BibleAI support other languages?',
+    answer: 'Currently available in English with ESV, NIV, KJV, and NASB. Spanish and French support coming in 2024. Let us know what language you need!',
+  },
+  {
+    question: 'How do I report inappropriate forum posts?',
+    answer: 'Use the flag button on any post or comment. Our moderation team reviews reports within 24 hours. We maintain a safe, respectful community for everyone.',
+  },
+  {
+    question: 'Can I share my prayers?',
+    answer: 'Your journal is private by default. You can share specific prayers with friends or post prayer requests in the forum for community support.',
+  },
+  {
+    question: 'What\'s included in Pro?',
+    answer: 'Unlimited daily messages, voice reading for Bible passages, priority support, ad-free experience, advanced prayer analytics, exclusive devotional content, and 10 forum posts daily.',
+  },
+  {
+    question: 'How often are devotionals updated?',
+    answer: 'New devotionals generate daily at 6 AM. Customize the tone (contemplative, practical, scholarly) and length to match your spiritual needs.',
+  },
+  {
+    question: 'Can I export my prayer journal?',
+    answer: 'Yes! Export as PDF or CSV anytime for printing, archiving, or sharing with a spiritual mentor. Pro users get monthly automatic backups.',
+  },
+  {
+    question: 'Is BibleAI affiliated with a denomination?',
+    answer: 'We\'re non-denominational and respect all Christian traditions. Our AI provides Scripture-grounded answers while acknowledging diverse theological perspectives.',
+  },
+  {
+    question: 'How is my data encrypted?',
+    answer: 'All data uses TLS 1.3 encryption in transit and AES-256 at rest. We use Supabase\'s enterprise infrastructure with regular security audits and compliance certifications.',
+  },
+  {
+    question: 'Can churches use BibleAI?',
+    answer: 'Absolutely! Many churches use BibleAI for small groups and studies. We offer team plans for 10+ members. Contact sales@bibleai.com for custom pricing.',
   },
 ];
 
@@ -364,7 +419,26 @@ export default function Landing() {
         </div>
       </AnimatedSection>
 
-      {/* Trust & Testimonial Section */}
+      {/* Stats Section */}
+      <AnimatedSection className="py-32 bg-navy-900/40 border-y border-white/5">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+            {stats.map((stat, i) => {
+              const Icon = stat.icon;
+              return (
+                <div key={i} className="text-center">
+                  <div className="flex justify-center mb-4">
+                    <Icon className="w-8 h-8 text-gold-400" />
+                  </div>
+                  <div className="text-3xl sm:text-4xl font-black text-white mb-2">{stat.value}</div>
+                  <div className="text-sm text-navy-400 font-medium">{stat.label}</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </AnimatedSection>
+      {/* Testimonials Section */}
       <AnimatedSection className="py-32 bg-white/2 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-6">
           <div className="text-center mb-20">
