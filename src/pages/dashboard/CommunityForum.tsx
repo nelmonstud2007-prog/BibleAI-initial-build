@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
+import { moderateContent, checkRateLimit } from '../../lib/moderation';
+import { RichTextEditor } from '../../components/RichTextEditor';
 import {
   MessageCircle,
   Heart,
@@ -18,6 +20,7 @@ import {
   Loader2,
   X,
   CheckCircle,
+  Eye as EyeIcon,
 } from 'lucide-react';
 import { trackEvent } from '../../lib/analytics';
 
@@ -76,6 +79,9 @@ export default function CommunityForum() {
   const [newComment, setNewComment] = useState('');
   const [postingComment, setPostingComment] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewContent, setPreviewContent] = useState('');
+  const [moderationError, setModerationError] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const postsPerPage = 10;
@@ -167,29 +173,25 @@ export default function CommunityForum() {
 
   const handleCreatePost = async () => {
     if (!user || !newPostTitle.trim() || !newPostContent.trim()) {
-      showToast('Please fill in title and message');
-      return;
-    }
-
-    if (newPostContent.length > 2000) {
-      showToast('Post must be less than 2000 characters');
+      setModerationError('Please fill in title and message');
       return;
     }
 
     setPosting(true);
+    setModerationError('');
     try {
-      // Rate limit check
-      const today = new Date().toISOString().split('T')[0];
-      const { data: todayPosts } = await supabase
-        .from('forum_posts')
-        .select('id')
-        .eq('user_id', user.id)
-        .gte('created_at', `${today}T00:00:00`)
-        .lt('created_at', `${today}T23:59:59`);
+      // Check rate limit
+      const rateLimitCheck = await checkRateLimit(user.id, 'post', isPro);
+      if (!rateLimitCheck.allowed) {
+        setModerationError(rateLimitCheck.message || 'You have reached your daily post limit.');
+        setPosting(false);
+        return;
+      }
 
-      const limit = isPro ? 10 : 3;
-      if ((todayPosts?.length || 0) >= limit) {
-        showToast(`Daily post limit (${limit}) reached. Upgrade to Pro for more.`);
+      // Run moderation check
+      const moderation = await moderateContent(newPostContent, user.id, 'post');
+      if (moderation.flagged) {
+        setModerationError(moderation.reason || 'Your post contains content that isn\'t allowed on BibleAI. Please review and resubmit.');
         setPosting(false);
         return;
       }

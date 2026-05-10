@@ -19,7 +19,8 @@ import Settings from './pages/dashboard/Settings';
 import PrayerAnalytics from './pages/dashboard/PrayerAnalytics';
 import Bible from './pages/dashboard/Bible';
 import Bookmarks from './pages/dashboard/Bookmarks';
-import Community from './pages/dashboard/Community';
+import CommunityVerseFeed from './pages/dashboard/CommunityVerseFeed';
+import CommunityForum from './pages/dashboard/CommunityForum';
 import SharedVerse from './pages/SharedVerse';
 import AdminDashboard from './pages/AdminDashboard';
 import SeoMeta from './components/SeoMeta';
@@ -78,7 +79,7 @@ export default function App() {
               <Route path="analytics" element={<PrayerAnalytics />} />
               <Route path="settings" element={<Settings />} />
               <Route path="bookmarks" element={<Bookmarks />} />
-              <Route path="community" element={<Community />} />
+              <Route path="community" element={<CommunityForum />} />
             </Route>
           </Routes>
         </BrowserRouter>
