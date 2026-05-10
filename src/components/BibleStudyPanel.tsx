@@ -60,7 +60,7 @@ const formatMessageContent = (content: string, onVerseClick?: (ref: string) => v
  */
 const TypewriterMessage = ({ content, onComplete, onVerseClick }: { content: string; onComplete?: () => void; onVerseClick?: (ref: string) => void }) => {
   // Split into tokens: words + whitespace runs
-  const tokens = useMemo(() => content.match(/(\S+|\s+)/g) ?? [], [content]);
+  const tokens = useMemo(() => (content || '').match(/(\S+|\s+)/g) ?? [], [content]);
   const [tokenIndex, setTokenIndex] = useState(0);
   const TOKENS_PER_TICK = 3;
 
