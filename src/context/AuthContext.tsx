@@ -115,6 +115,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(session?.user ?? null);
       if (session?.user) {
         fetchProfile(session.user.id);
+        // Sync Google OAuth metadata to profile if needed
+        if (_event === 'SIGNED_IN' && session.user.user_metadata?.full_name) {
+          supabase
+            .from('profiles')
+            .update({ full_name: session.user.user_metadata.full_name })
+            .eq('id', session.user.id)
+            .then(() => {
+              // Profile synced with Google name
+            });
+        }
       } else {
         setSubscriptionTier('free');
         setProfileCompleted(false);

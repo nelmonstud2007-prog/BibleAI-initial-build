@@ -62,26 +62,8 @@ const churchIcons = [
 // Live stats fetched from Supabase
 interface PlatformStats { users: number; verses_saved: number; forum_posts: number; app_version: string; }
 
-const testimonials = [
-  {
-    name: 'Sarah Mitchell',
-    role: 'Youth Ministry Leader',
-    photo: 'https://images.pexels.com/photos/774909/pexels-photo-774909.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&dpr=2',
-    quote: 'BibleAI has completely transformed my quiet time. I ask questions I\'ve always wondered about and get thoughtful, scripture-grounded answers within seconds.',
-  },
-  {
-    name: 'David Okonkwo',
-    role: 'Pastor & Seminary Student',
-    photo: 'https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&dpr=2',
-    quote: 'The prayer journal feature keeps me accountable. I\'ve seen God answer so many prayers I would have otherwise forgotten I even prayed. It strengthens my faith daily.',
-  },
-  {
-    name: 'Emily Chen',
-    role: 'Homeschool Mom',
-    photo: 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&dpr=2',
-    quote: 'Every morning, my kids and I start the day with the daily devotional. It\'s become our favorite family routine. The reflections are always spot-on and encouraging.',
-  },
-];
+// Testimonials removed - only real user reviews will be displayed when available
+const testimonials: any[] = [];
 
 const faqCategories = [
   {
@@ -506,33 +488,7 @@ export default function Landing() {
           </div>
         </AnimatedSection>
       )}
-      {/* Testimonials Section */}
-      <AnimatedSection className="py-32 bg-white/2 backdrop-blur-sm">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center mb-20">
-             <div className="flex justify-center gap-1 mb-4 text-gold-400">
-                {[1,2,3,4,5].map(i => <Star key={i} className="w-5 h-5 fill-gold-400" />)}
-             </div>
-             <h2 className="text-3xl sm:text-5xl font-bold text-white mb-6">Loved by Thousands</h2>
-             <p className="text-navy-300">Join a global community of believers growing through technology.</p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {testimonials.map((t, i) => (
-              <div key={i} className="bg-navy-900 border border-white/5 p-8 rounded-[2.5rem] hover:border-white/10 transition-all duration-300 group">
-                 <div className="flex items-center gap-4 mb-6">
-                    <img src={t.photo} alt={t.name} className="w-14 h-14 rounded-2xl object-cover grayscale group-hover:grayscale-0 transition-all duration-500" />
-                    <div>
-                       <h4 className="font-bold text-white">{t.name}</h4>
-                       <p className="text-[10px] font-bold text-navy-500 uppercase tracking-widest">{t.role}</p>
-                    </div>
-                 </div>
-                 <p className="text-navy-200 text-sm leading-relaxed italic">"{t.quote}"</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </AnimatedSection>
+      {/* Testimonials Section - Removed fake reviews */}
 
       {/* FAQ Section */}
       <AnimatedSection id="faq" className="py-32">
