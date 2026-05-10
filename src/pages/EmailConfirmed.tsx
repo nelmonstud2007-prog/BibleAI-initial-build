@@ -11,9 +11,28 @@ export default function EmailConfirmed() {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        setLoading(false);
+        // Check if profile is already completed (e.g. Google user or already filled)
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('profile_completed')
+          .eq('id', session.user.id)
+          .maybeSingle();
+        
+        if (profile?.profile_completed) {
+          navigate('/dashboard');
+        } else {
+          setLoading(false);
+        }
       } else {
-        setTimeout(() => navigate('/signin'), 3000);
+        // No session, wait a bit for Supabase to process the hash/token
+        setTimeout(async () => {
+          const { data: { session: retrySession } } = await supabase.auth.getSession();
+          if (retrySession) {
+            setLoading(false);
+          } else {
+            navigate('/signin');
+          }
+        }, 2000);
       }
     };
     checkSession();

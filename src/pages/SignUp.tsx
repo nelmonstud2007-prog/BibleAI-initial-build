@@ -5,12 +5,28 @@ import { Mail, Lock, Loader2, ArrowRight, User, CheckCircle2, Cross, Eye, EyeOff
 import { trackEvent } from '../lib/analytics';
 
 const SOCIAL_PROOF = [
-  { count: '50K+', label: 'Believers' },
-  { count: '1M+', label: 'Prayers Logged' },
-  { count: '4.9★', label: 'Rating' },
+  { key: 'users', label: 'Believers', default: '10+' },
+  { key: 'verses_saved', label: 'Verses Saved', default: '10+' },
+  { key: 'forum_posts', label: 'Discussions', default: '10+' },
 ];
 
 export default function SignUp() {
+  const [stats, setStats] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    supabase.rpc('get_platform_stats').then(({ data }) => {
+      if (data) {
+        const newStats: Record<string, string> = {};
+        Object.entries(data).forEach(([key, value]) => {
+          if (typeof value === 'number') {
+            const rounded = Math.max(10, Math.round(value / 10) * 10);
+            newStats[key] = `${rounded.toLocaleString()}+`;
+          }
+        });
+        setStats(newStats);
+      }
+    });
+  }, []);
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -24,6 +40,8 @@ export default function SignUp() {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [resendMessage, setResendMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
   // Username availability debounce
   const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
   const [checkingUsername, setCheckingUsername] = useState(false);
@@ -90,7 +108,15 @@ export default function SignUp() {
           emailRedirectTo: `${window.location.origin}/email-confirmed`,
         },
       });
-      if (signUpError) { setError(signUpError.message); setLoading(false); return; }
+      if (signUpError) { 
+        if (signUpError.message.includes('already registered')) {
+          setError('This email is already registered. Please sign in instead.');
+        } else {
+          setError(signUpError.message);
+        }
+        setLoading(false); 
+        return; 
+      }
       if (data?.user) {
         await new Promise(r => setTimeout(r, 800));
         await supabase.from('profiles').update({ username: username.toLowerCase(), full_name: fullName }).eq('id', data.user.id);
@@ -101,11 +127,32 @@ export default function SignUp() {
     finally { setLoading(false); }
   };
 
+  const handleResendEmail = async () => {
+    if (resending) return;
+    setResending(true);
+    setResendMessage(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('resend-confirmation', {
+        body: { email },
+      });
+      if (error) throw error;
+      if (data?.error) {
+        setResendMessage({ type: 'error', text: data.error });
+      } else {
+        setResendMessage({ type: 'success', text: 'Confirmation email resent! Please check your inbox.' });
+      }
+    } catch (err: any) {
+      setResendMessage({ type: 'error', text: err.message || 'Failed to resend email. Please try again later.' });
+    } finally {
+      setResending(false);
+    }
+  };
+
   const handleGoogleSignUp = async () => {
     setGoogleLoading(true);
     const { error: googleError } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${window.location.origin}/dashboard` },
+      options: { redirectTo: `${window.location.origin}/complete-profile` },
     });
     if (googleError) {
       setError(googleError.message);
@@ -129,13 +176,35 @@ export default function SignUp() {
                 Click it to activate your account and begin your journey.
               </p>
             </div>
-            <div className="bg-gold-400/5 border border-gold-400/20 rounded-2xl p-4">
+            <div className="bg-gold-400/5 border border-gold-400/20 rounded-2xl p-6 space-y-4">
               <p className="text-xs text-navy-300 font-medium">
-                Didn&apos;t receive it? Check your spam folder or{' '}
-                <button onClick={() => setSuccess(false)} className="text-gold-400 hover:text-white transition-colors font-bold">
-                  try again
-                </button>
+                Didn&apos;t receive it? Check your spam folder or click below to send it again.
               </p>
+              <button 
+                onClick={handleResendEmail}
+                disabled={resending}
+                className="w-full py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold text-white transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {resending ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : (
+                  <Mail className="w-3 h-3" />
+                )}
+                {resending ? 'Sending...' : 'Resend Confirmation Email'}
+              </button>
+              {resendMessage && (
+                <p className={`text-[10px] font-bold ${resendMessage.type === 'success' ? 'text-emerald-400' : 'text-red-400'} animate-slide-up-fade`}>
+                  {resendMessage.text}
+                </p>
+              )}
+              <div className="pt-2 border-t border-white/5">
+                <p className="text-[10px] text-navy-500">
+                  Entered the wrong email?{' '}
+                  <button onClick={() => setSuccess(false)} className="text-gold-400 hover:text-white transition-colors font-bold">
+                    Go back
+                  </button>
+                </p>
+              </div>
             </div>
             <Link
               to="/signin"
@@ -174,16 +243,16 @@ export default function SignUp() {
               <span className="text-gold-gradient bg-clip-text text-transparent">sacred journey</span>
             </h2>
             <p className="text-navy-300 text-lg leading-relaxed">
-              Join thousands of believers growing in faith through the power of AI and Scripture.
+              Join a growing community of believers growing in faith through the power of AI and Scripture.
             </p>
           </div>
 
           {/* Social proof */}
           <div className="grid grid-cols-3 gap-4">
-            {SOCIAL_PROOF.map(({ count, label }) => (
-              <div key={label} className="bg-white/5 border border-white/5 rounded-2xl p-4 text-center">
-                <p className="text-xl font-black text-gold-400">{count}</p>
-                <p className="text-[10px] font-bold text-navy-500 uppercase tracking-widest mt-1">{label}</p>
+            {SOCIAL_PROOF.map((item) => (
+              <div key={item.label} className="bg-white/5 border border-white/5 rounded-2xl p-4 text-center">
+                <p className="text-xl font-black text-gold-400">{stats[item.key] || item.default}</p>
+                <p className="text-[10px] font-bold text-navy-500 uppercase tracking-widest mt-1">{item.label}</p>
               </div>
             ))}
           </div>

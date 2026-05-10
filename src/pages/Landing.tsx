@@ -258,20 +258,19 @@ export default function Landing() {
   }, []);
 
   const formatStatValue = (key: string, value: number): string => {
+    // Round to nearest 10 as requested
+    const rounded = Math.max(10, Math.round(value / 10) * 10);
+    
     if (key === 'users') {
-      if (value < 10) return 'A growing community';
-      if (value < 100) return `${value}+ believers`;
-      return `${value.toLocaleString()}+`;
+      return `${rounded.toLocaleString()}+ believers`;
     }
     if (key === 'verses_saved') {
-      if (value < 10) return 'Verses being saved';
-      return `${value.toLocaleString()}+`;
+      return `${rounded.toLocaleString()}+ verses`;
     }
     if (key === 'forum_posts') {
-      if (value < 5) return 'Community growing';
-      return `${value.toLocaleString()}+`;
+      return `${rounded.toLocaleString()}+ discussions`;
     }
-    return String(value);
+    return String(rounded);
   };
 
   return (

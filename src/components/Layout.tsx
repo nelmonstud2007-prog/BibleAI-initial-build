@@ -35,9 +35,31 @@ export default function DashboardLayout() {
   const location = useLocation();
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [resendStatus, setResendStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const { streak } = useStreak(user?.id);
 
   const isActive = (path: string) => location.pathname === path;
+
+  const handleResendEmail = async () => {
+    if (!user?.email || resending) return;
+    setResending(true);
+    setResendStatus('idle');
+    try {
+      const { data, error } = await supabase.functions.invoke('resend-confirmation', {
+        body: { email: user.email },
+      });
+      if (error || data?.error) throw new Error(error?.message || data?.error);
+      setResendStatus('success');
+      setTimeout(() => setResendStatus('idle'), 5000);
+    } catch (err) {
+      console.error('Resend failed:', err);
+      setResendStatus('error');
+      setTimeout(() => setResendStatus('idle'), 5000);
+    } finally {
+      setResending(false);
+    }
+  };
   const visibleNavItems = navItems.filter(item => !(item.proOnly && !isPro));
   const mobileNavItems = navItems.filter(item => MOBILE_NAV_ITEMS.includes(item.path));
 
@@ -206,14 +228,25 @@ export default function DashboardLayout() {
 
         {/* Email verification banner */}
         {user && !user.email_confirmed_at && (
-          <div className="bg-gold-400/5 border-b border-gold-400/10 px-6 py-3 flex items-center justify-between animate-slide-up-fade" role="alert">
+          <div className="bg-gold-400/5 border-b border-gold-400/10 px-5 py-2.5 flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <Mail className="w-4 h-4 text-gold-400" aria-hidden="true" />
-              <p className="text-[10px] font-bold text-white uppercase tracking-widest">Please verify your email address</p>
+              <p className="text-[10px] font-bold text-white uppercase tracking-widest">
+                {resendStatus === 'success' ? 'Email Sent!' : resendStatus === 'error' ? 'Failed to send' : 'Please verify your email address'}
+              </p>
             </div>
-            <button onClick={() => window.location.reload()} className="text-[9px] font-bold text-navy-500 uppercase tracking-widest hover:text-white transition-colors">
-              I've Verified
-            </button>
+            <div className="flex items-center gap-4">
+              <button 
+                onClick={handleResendEmail} 
+                disabled={resending}
+                className="text-[9px] font-bold text-gold-400 uppercase tracking-widest hover:text-white transition-colors disabled:opacity-50"
+              >
+                {resending ? 'Sending...' : 'Resend Email'}
+              </button>
+              <button onClick={() => window.location.reload()} className="text-[9px] font-bold text-navy-500 uppercase tracking-widest hover:text-white transition-colors">
+                I've Verified
+              </button>
+            </div>
           </div>
         )}
 

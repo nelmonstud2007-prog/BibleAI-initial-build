@@ -82,7 +82,7 @@ self.addEventListener('push', (event) => {
   try { payload = event.data.json(); } catch { payload = { title: 'BibleAI', body: event.data.text() }; }
   const options = {
     body: payload.body || 'Your daily devotional is ready.',
-    icon: '/icon-192.png', badge: '/icon-72.png', tag: 'bibleai-daily', renotify: true,
+    icon: '/favicon-192.png', badge: '/favicon-128.png', tag: 'bibleai-daily', renotify: true,
     data: { url: payload.url || '/dashboard' },
     actions: [{ action: 'open', title: 'Open BibleAI' }, { action: 'dismiss', title: 'Dismiss' }],
   };

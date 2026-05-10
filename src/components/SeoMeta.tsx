@@ -37,7 +37,7 @@ function getPageMeta(pathname: string): MetaConfig {
   if (pathname === '/' || pathname === '/landing') {
     return {
       title: 'BibleAI — AI-Powered Scripture & Prayer',
-      description: 'Discover scripture, track your prayers, and grow your faith with AI-powered Bible study. Join thousands of believers.',
+      description: 'Discover scripture, track your prayers, and grow your faith with AI-powered Bible study. Join a growing community of believers.',
       image: DEFAULT_OG_IMAGE,
       type: 'website',
     };
@@ -114,9 +114,16 @@ export default function SeoMeta() {
     upsertMeta('meta[name="twitter:image"]', 'name', 'twitter:image', meta.image);
 
     // PWA / Mobile
+    upsertMeta('meta[name="mobile-web-app-capable"]', 'name', 'mobile-web-app-capable', 'yes');
     upsertMeta('meta[name="apple-mobile-web-app-capable"]', 'name', 'apple-mobile-web-app-capable', 'yes');
     upsertMeta('meta[name="apple-mobile-web-app-status-bar-style"]', 'name', 'apple-mobile-web-app-status-bar-style', 'black-translucent');
     upsertMeta('meta[name="apple-mobile-web-app-title"]', 'name', 'apple-mobile-web-app-title', 'BibleAI');
+
+    // Fix apple-touch-icon if it exists in head
+    const appleIcon = document.head.querySelector<HTMLLinkElement>('link[rel="apple-touch-icon"]');
+    if (appleIcon) {
+      appleIcon.setAttribute('href', '/favicon-192.png');
+    }
 
     upsertCanonical(canonicalUrl);
   }, [location.pathname]);

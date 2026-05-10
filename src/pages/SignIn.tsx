@@ -45,11 +45,13 @@ export default function SignIn() {
     }
     const { error: signInError } = await supabase.auth.signInWithPassword({ email: resolvedEmail, password });
     if (signInError) {
-      setError(
-        signInError.message === 'Invalid login credentials'
-          ? 'Incorrect email/username or password. Please try again.'
-          : signInError.message
-      );
+      if (signInError.message.includes('Email not confirmed')) {
+        setError('Please confirm your email address before signing in.');
+      } else if (signInError.message === 'Invalid login credentials') {
+        setError('Incorrect email/username or password. Please try again.');
+      } else {
+        setError(signInError.message);
+      }
       setLoading(false);
       return;
     }
@@ -61,7 +63,7 @@ export default function SignIn() {
     setGoogleLoading(true);
     const { error: googleError } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${window.location.origin}/dashboard` },
+      options: { redirectTo: `${window.location.origin}/complete-profile` },
     });
     if (googleError) {
       setError(googleError.message);
