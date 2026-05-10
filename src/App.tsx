@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
+import { ThemeProvider } from './context/ThemeContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import DashboardLayout from './components/Layout';
 import Landing from './pages/Landing';
@@ -19,81 +20,69 @@ import PrayerAnalytics from './pages/dashboard/PrayerAnalytics';
 import Bible from './pages/dashboard/Bible';
 import Bookmarks from './pages/dashboard/Bookmarks';
 import Community from './pages/dashboard/Community';
+import SharedVerse from './pages/SharedVerse';
+import AdminDashboard from './pages/AdminDashboard';
 import SeoMeta from './components/SeoMeta';
 import ErrorBoundary from './components/ErrorBoundary';
 
-/**
- * Route layout:
- *
- * Public (accessible logged-in OR logged-out):
- *   /          → Landing
- *   /pricing   → Landing (or a dedicated Pricing page if you create one)
- *   /signin    → SignIn
- *   /signup    → SignUp
- *   /privacy   → Privacy
- *   /terms     → Terms
- *   /upgrade-success → UpgradeSuccess (must be accessible post-checkout redirect)
- *
- * Semi-protected (must be logged in, profile completion NOT required):
- *   /email-confirmed   → EmailConfirmed
- *   /complete-profile  → CompleteProfile
- *
- * Protected (must be logged in + profile complete):
- *   /dashboard/*
- */
 export default function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <SeoMeta />
-        <Routes>
-          {/* ── Public routes (no forced redirect for logged-in users) ── */}
-          <Route path="/" element={<Landing />} />
-          <Route path="/landing" element={<Landing />} />
-          {/* If you have a dedicated Pricing page, replace Landing below */}
-          <Route path="/pricing" element={<Landing />} />
-          <Route path="/signin" element={<SignIn />} />
-          <Route path="/signup" element={<SignUp />} />
-          <Route path="/email-confirmed" element={<EmailConfirmed />} />
-          <Route path="/privacy" element={<Privacy />} />
-          <Route path="/terms" element={<Terms />} />
+    <ThemeProvider>
+      <AuthProvider>
+        <BrowserRouter>
+          <SeoMeta />
+          <Routes>
+            {/* ── Public routes ── */}
+            <Route path="/" element={<Landing />} />
+            <Route path="/landing" element={<Landing />} />
+            <Route path="/pricing" element={<Landing />} />
+            <Route path="/signin" element={<SignIn />} />
+            <Route path="/signup" element={<SignUp />} />
+            <Route path="/email-confirmed" element={<EmailConfirmed />} />
+            <Route path="/privacy" element={<Privacy />} />
+            <Route path="/terms" element={<Terms />} />
+            <Route path="/upgrade-success" element={<UpgradeSuccess />} />
 
-          {/* ── Upgrade success (public URL, Stripe redirects here) ── */}
-          <Route path="/upgrade-success" element={<UpgradeSuccess />} />
+            {/* ── Shared verse page (public, no auth required) ── */}
+            <Route path="/share/:id" element={<SharedVerse />} />
 
-          {/* ── Semi-protected (logged in, profile completion not enforced) ── */}
-          <Route
-            path="/complete-profile"
-            element={
-              <ProtectedRoute requireProfileComplete={false}>
-                <CompleteProfile />
-              </ProtectedRoute>
-            }
-          />
+            {/* ── Admin dashboard (hidden URL, password-gated) ── */}
+            <Route path="/admin-x7k9p2" element={<AdminDashboard />} />
 
-          {/* ── Protected dashboard ── */}
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute>
-                <ErrorBoundary>
-                  <DashboardLayout />
-                </ErrorBoundary>
-              </ProtectedRoute>
-            }
-          >
-            <Route index element={<DashboardHome />} />
-            <Route path="bible-chat" element={<BibleChat />} />
-            <Route path="prayer-journal" element={<PrayerJournal />} />
-            <Route path="daily-verse" element={<DailyVerse />} />
-            <Route path="bible" element={<Bible />} />
-            <Route path="analytics" element={<PrayerAnalytics />} />
-            <Route path="settings" element={<Settings />} />
-            <Route path="bookmarks" element={<Bookmarks />} />
-            <Route path="community" element={<Community />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
-    </AuthProvider>
+            {/* ── Semi-protected ── */}
+            <Route
+              path="/complete-profile"
+              element={
+                <ProtectedRoute requireProfileComplete={false}>
+                  <CompleteProfile />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* ── Protected dashboard ── */}
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute>
+                  <ErrorBoundary>
+                    <DashboardLayout />
+                  </ErrorBoundary>
+                </ProtectedRoute>
+              }
+            >
+              <Route index element={<DashboardHome />} />
+              <Route path="bible-chat" element={<BibleChat />} />
+              <Route path="prayer-journal" element={<PrayerJournal />} />
+              <Route path="daily-verse" element={<DailyVerse />} />
+              <Route path="bible" element={<Bible />} />
+              <Route path="analytics" element={<PrayerAnalytics />} />
+              <Route path="settings" element={<Settings />} />
+              <Route path="bookmarks" element={<Bookmarks />} />
+              <Route path="community" element={<Community />} />
+            </Route>
+          </Routes>
+        </BrowserRouter>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }

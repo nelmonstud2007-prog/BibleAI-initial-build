@@ -1,23 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Link, useLocation, Outlet } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import {
-  Home,
-  MessageCircle,
-  BookOpen,
-  Sun,
-  BarChart3,
-  Settings,
-  LogOut,
-  Cross,
-  Crown,
-  Book,
-  Flame,
-  ChevronRight,
-  Sparkles,
-  Mail,
-  Bookmark,
-  Users
+  Home, MessageCircle, BookOpen, Sun, BarChart3, Settings, LogOut,
+  Crown, Book, Flame, ChevronRight, Sparkles, Mail, Bookmark, Users,
+  Moon, SunMedium, Shield, Award, Menu, X
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import UpgradeModal from './UpgradeModal';
@@ -26,177 +14,228 @@ import OnboardingQuiz from './OnboardingQuiz';
 import { supabase } from '../lib/supabase';
 import { useStreak } from '../lib/useStreak';
 
-const navItems: Array<{
-  path: string;
-  label: string;
-  icon: LucideIcon;
-  proOnly?: boolean;
-}> = [
-  { path: '/dashboard', label: 'Home', icon: Home },
-  { path: '/dashboard/bible', label: 'Bible', icon: Book },
-  { path: '/dashboard/bible-chat', label: 'Chat', icon: MessageCircle },
-  { path: '/dashboard/prayer-journal', label: 'Journal', icon: BookOpen },
-  { path: '/dashboard/daily-verse', label: 'Daily', icon: Sun },
-  { path: '/dashboard/analytics', label: 'Stats', icon: BarChart3, proOnly: true },
-  { path: '/dashboard/bookmarks', label: 'Saved', icon: Bookmark },
-  { path: '/dashboard/community', label: 'Community', icon: Users },
-  { path: '/dashboard/settings', label: 'Settings', icon: Settings },
+const navItems: Array<{ path: string; label: string; icon: LucideIcon; proOnly?: boolean }> = [
+  { path: '/dashboard',                  label: 'Home',      icon: Home },
+  { path: '/dashboard/bible',            label: 'Bible',     icon: Book },
+  { path: '/dashboard/bible-chat',       label: 'Chat',      icon: MessageCircle },
+  { path: '/dashboard/prayer-journal',   label: 'Journal',   icon: BookOpen },
+  { path: '/dashboard/daily-verse',      label: 'Daily',     icon: Sun },
+  { path: '/dashboard/bookmarks',        label: 'Saved',     icon: Bookmark },
+  { path: '/dashboard/community',        label: 'Community', icon: Users },
+  { path: '/dashboard/analytics',        label: 'Stats',     icon: BarChart3, proOnly: true },
+  { path: '/dashboard/settings',         label: 'Settings',  icon: Settings },
 ];
+
+// Bottom nav shows 5 most important items on mobile
+const MOBILE_NAV_ITEMS = ['/dashboard', '/dashboard/bible', '/dashboard/bible-chat', '/dashboard/prayer-journal', '/dashboard/community'];
 
 export default function DashboardLayout() {
   const { user, signOut, isPro } = useAuth();
+  const { theme, toggleTheme, isDark } = useTheme();
   const location = useLocation();
   const [showUpgrade, setShowUpgrade] = useState(false);
-  const { streak, loading: streakLoading } = useStreak(user?.id);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { streak } = useStreak(user?.id);
 
   const isActive = (path: string) => location.pathname === path;
-
-  const visibleNavItems = navItems.filter(item => {
-    if (item.proOnly && !isPro) return false;
-    return true;
-  });
+  const visibleNavItems = navItems.filter(item => !(item.proOnly && !isPro));
+  const mobileNavItems = navItems.filter(item => MOBILE_NAV_ITEMS.includes(item.path));
 
   return (
-    <div className="min-h-screen bg-navy-950 flex selection:bg-gold-400/30 selection:text-white">
+    <div className={`min-h-screen flex selection:bg-gold-400/30 selection:text-white transition-colors duration-300 ${isDark ? 'bg-navy-950' : 'bg-slate-50'}`}>
       <UpgradeModal open={showUpgrade} onClose={() => setShowUpgrade(false)} />
       <OnboardingTour />
       <OnboardingQuiz />
 
-      {/* Modern Minimalist Sidebar */}
-      <aside className="hidden lg:flex lg:flex-col lg:static inset-y-0 left-0 z-50 w-64 bg-navy-900 border-r border-white/5 relative overflow-hidden">
-        
-        <div className="flex flex-col h-full relative z-10">
-          {/* Clean Logo */}
+      {/* ── Desktop Sidebar ── */}
+      <aside className={`hidden lg:flex lg:flex-col w-64 border-r relative overflow-hidden transition-colors duration-300 ${isDark ? 'bg-navy-900 border-white/5' : 'bg-white border-slate-200'}`}
+        role="navigation" aria-label="Main navigation">
+        <div className="flex flex-col h-full">
+          {/* Logo */}
           <div className="px-6 py-8">
-            <Link to="/dashboard" className="flex items-center gap-3 group">
+            <Link to="/dashboard" className="flex items-center gap-3 group" aria-label="BibleAI Home">
               <div className="w-9 h-9 bg-gold-gradient rounded-xl flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform duration-300">
-                <Cross className="w-5 h-5 text-navy-950" />
+                <span className="text-navy-950 font-bold text-base">✝</span>
               </div>
-              <h1 className="text-lg font-bold text-white tracking-tight">BibleAI</h1>
+              <h1 className={`text-lg font-bold tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>BibleAI</h1>
             </Link>
           </div>
 
-          {/* Minimal Streak Display */}
+          {/* Streak */}
           <div className="px-4 mb-6">
-             <div className="bg-white/5 border border-white/5 rounded-2xl p-4 flex items-center justify-between group hover:border-white/10 transition-colors">
-                <div className="flex items-center gap-3">
-                   <Flame className="w-4 h-4 text-amber-500" />
-                   <div>
-                      <p className="text-xs font-bold text-white uppercase tracking-wider">{streak} Day Streak</p>
-                   </div>
+            <div className={`border rounded-2xl p-4 flex items-center justify-between transition-colors ${isDark ? 'bg-white/5 border-white/5 hover:border-white/10' : 'bg-slate-50 border-slate-200 hover:border-slate-300'}`}>
+              <div className="flex items-center gap-3">
+                <Flame className="w-4 h-4 text-amber-500" aria-hidden="true" />
+                <div>
+                  <p className={`text-xs font-bold uppercase tracking-wider ${isDark ? 'text-white' : 'text-slate-900'}`}>{streak} Day Streak</p>
                 </div>
-                <ChevronRight className="w-3.5 h-3.5 text-navy-700" />
-             </div>
+              </div>
+              <ChevronRight className={`w-3.5 h-3.5 ${isDark ? 'text-navy-700' : 'text-slate-400'}`} aria-hidden="true" />
+            </div>
           </div>
 
-          {/* Direct Navigation */}
+          {/* Nav */}
           <nav className="flex-1 px-3 space-y-1 overflow-y-auto scrollbar-none">
             {visibleNavItems.map((item) => {
               const Icon = item.icon;
               const active = isActive(item.path);
               return (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  className={`group flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-200 ${
+                <Link key={item.path} to={item.path}
+                  className={`group flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-400 ${
                     active
-                      ? 'bg-white/5 text-gold-400 shadow-sm'
-                      : 'text-navy-400 hover:text-white hover:bg-white/5'
+                      ? isDark ? 'bg-white/5 text-gold-400' : 'bg-gold-50 text-gold-600'
+                      : isDark ? 'text-navy-400 hover:text-white hover:bg-white/5' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'
                   }`}
-                >
-                  <Icon className={`w-5 h-5 ${active ? 'text-gold-400' : ''}`} />
+                  aria-current={active ? 'page' : undefined}>
+                  <Icon className={`w-5 h-5 ${active ? (isDark ? 'text-gold-400' : 'text-gold-600') : ''}`} aria-hidden="true" />
                   {item.label}
                 </Link>
               );
             })}
           </nav>
 
-          {/* Simple Upgrade CTA */}
+          {/* Upgrade CTA */}
           {!isPro && (
-            <div className="px-3 py-6">
-              <button
-                onClick={() => setShowUpgrade(true)}
-                className="w-full flex items-center gap-3 px-4 py-3.5 bg-gold-gradient text-navy-950 font-bold rounded-xl hover:scale-105 transition-all text-sm justify-center"
-              >
-                <Crown className="w-4 h-4" />
+            <div className="px-3 py-4">
+              <button onClick={() => setShowUpgrade(true)}
+                className="w-full flex items-center gap-3 px-4 py-3.5 bg-gold-gradient text-navy-950 font-bold rounded-xl hover:scale-105 transition-all text-sm justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-400">
+                <Crown className="w-4 h-4" aria-hidden="true" />
                 Upgrade to Pro
               </button>
             </div>
           )}
 
-          {/* User Section */}
-          <div className="px-3 py-4 border-t border-white/5 bg-navy-900/50">
-            <div className="flex items-center gap-3 px-4 py-2 mb-3">
-              <div className="w-9 h-9 bg-gold-gradient rounded-full flex items-center justify-center text-navy-950 font-bold text-sm">
+          {/* Bottom: theme toggle + user */}
+          <div className={`px-3 py-4 border-t ${isDark ? 'border-white/5 bg-navy-900/50' : 'border-slate-200 bg-slate-50'}`}>
+            {/* Dark mode toggle */}
+            <button onClick={toggleTheme}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold mb-2 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-400 ${isDark ? 'text-navy-400 hover:text-white hover:bg-white/5' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'}`}
+              aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}>
+              {isDark ? <SunMedium className="w-4 h-4" aria-hidden="true" /> : <Moon className="w-4 h-4" aria-hidden="true" />}
+              {isDark ? 'Light Mode' : 'Dark Mode'}
+            </button>
+
+            {/* User info */}
+            <div className={`flex items-center gap-3 px-4 py-2 mb-2 rounded-xl ${isDark ? '' : ''}`}>
+              <div className="w-9 h-9 bg-gold-gradient rounded-full flex items-center justify-center text-navy-950 font-bold text-sm flex-shrink-0" aria-hidden="true">
                 {user?.email?.[0]?.toUpperCase() ?? 'U'}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-bold text-white truncate">{user?.email}</p>
-                <p className="text-[10px] text-navy-500 font-bold uppercase tracking-wider">{isPro ? 'Pro Member' : 'Free Plan'}</p>
+                <p className={`text-xs font-bold truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>{user?.email}</p>
+                <p className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-navy-500' : 'text-slate-400'}`}>{isPro ? 'Pro Member' : 'Free Plan'}</p>
               </div>
             </div>
-            <button
-              onClick={signOut}
-              className="group flex items-center gap-3 px-4 py-3 w-full rounded-xl text-xs font-bold text-navy-500 hover:text-red-400 hover:bg-red-400/5 transition-all"
-            >
-              <LogOut className="w-4 h-4" />
+            <button onClick={signOut}
+              className={`flex items-center gap-3 px-4 py-3 w-full rounded-xl text-xs font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 ${isDark ? 'text-navy-500 hover:text-red-400 hover:bg-red-400/5' : 'text-slate-400 hover:text-red-500 hover:bg-red-50'}`}>
+              <LogOut className="w-4 h-4" aria-hidden="true" />
               Sign Out
             </button>
           </div>
         </div>
       </aside>
 
-      {/* Main content */}
-      <div className="flex-1 flex flex-col min-w-0 bg-navy-950">
-        {/* Top bar for mobile */}
-        <header className="lg:hidden flex items-center justify-between px-6 py-4 bg-navy-950 border-b border-white/5 sticky top-0 z-30">
+      {/* ── Mobile Overlay Menu ── */}
+      {mobileMenuOpen && (
+        <div className="lg:hidden fixed inset-0 z-[60] flex">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setMobileMenuOpen(false)} />
+          <div className={`relative w-72 h-full flex flex-col shadow-2xl animate-slide-in-left ${isDark ? 'bg-navy-900' : 'bg-white'}`}>
+            <div className="flex items-center justify-between px-6 py-5 border-b border-white/5">
+              <span className={`font-bold text-lg ${isDark ? 'text-white' : 'text-slate-900'}`}>Menu</span>
+              <button onClick={() => setMobileMenuOpen(false)} className={`p-2 rounded-xl ${isDark ? 'text-navy-400 hover:text-white' : 'text-slate-400 hover:text-slate-900'}`} aria-label="Close menu">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+              {visibleNavItems.map((item) => {
+                const Icon = item.icon;
+                const active = isActive(item.path);
+                return (
+                  <Link key={item.path} to={item.path} onClick={() => setMobileMenuOpen(false)}
+                    className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${active ? (isDark ? 'bg-white/5 text-gold-400' : 'bg-gold-50 text-gold-600') : (isDark ? 'text-navy-400 hover:text-white hover:bg-white/5' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100')}`}>
+                    <Icon className="w-5 h-5" aria-hidden="true" />
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </nav>
+            <div className={`px-3 py-4 border-t ${isDark ? 'border-white/5' : 'border-slate-200'}`}>
+              <button onClick={toggleTheme}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold mb-2 transition-all ${isDark ? 'text-navy-400 hover:text-white hover:bg-white/5' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'}`}>
+                {isDark ? <SunMedium className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+                {isDark ? 'Light Mode' : 'Dark Mode'}
+              </button>
+              <button onClick={signOut}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold transition-all ${isDark ? 'text-navy-500 hover:text-red-400 hover:bg-red-400/5' : 'text-slate-400 hover:text-red-500 hover:bg-red-50'}`}>
+                <LogOut className="w-4 h-4" />
+                Sign Out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Main Content ── */}
+      <div className={`flex-1 flex flex-col min-w-0 transition-colors duration-300 ${isDark ? 'bg-navy-950' : 'bg-slate-50'}`}>
+        {/* Mobile top bar */}
+        <header className={`lg:hidden flex items-center justify-between px-5 py-4 border-b sticky top-0 z-30 transition-colors duration-300 ${isDark ? 'bg-navy-950/90 border-white/5 backdrop-blur-sm' : 'bg-white/90 border-slate-200 backdrop-blur-sm'}`}
+          role="banner">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-gold-gradient rounded-lg flex items-center justify-center">
-               <Cross className="w-4 h-4 text-navy-950" />
+              <span className="text-navy-950 font-bold text-sm">✝</span>
             </div>
-            <span className="text-white font-bold text-lg">BibleAI</span>
+            <span className={`font-bold text-lg ${isDark ? 'text-white' : 'text-slate-900'}`}>BibleAI</span>
           </div>
-          {isPro && (
-            <div className="w-7 h-7 bg-gold-400/10 rounded-lg flex items-center justify-center text-gold-400">
-               <Crown className="w-3.5 h-3.5" />
-            </div>
-          )}
+          <div className="flex items-center gap-2">
+            <button onClick={toggleTheme}
+              className={`p-2 rounded-xl transition-colors ${isDark ? 'text-navy-400 hover:text-white' : 'text-slate-400 hover:text-slate-900'}`}
+              aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}>
+              {isDark ? <SunMedium className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </button>
+            {isPro && (
+              <div className="w-7 h-7 bg-gold-400/10 rounded-lg flex items-center justify-center text-gold-400" aria-label="Pro member">
+                <Crown className="w-3.5 h-3.5" aria-hidden="true" />
+              </div>
+            )}
+            <button onClick={() => setMobileMenuOpen(true)}
+              className={`p-2 rounded-xl transition-colors ${isDark ? 'text-navy-400 hover:text-white' : 'text-slate-400 hover:text-slate-900'}`}
+              aria-label="Open menu" aria-expanded={mobileMenuOpen}>
+              <Menu className="w-5 h-5" />
+            </button>
+          </div>
         </header>
 
-        {/* Page content */}
-        <main className="flex-1 overflow-y-auto pb-24 lg:pb-0 scroll-smooth">
-          {user && !user.email_confirmed_at && (
-            <div className="bg-gold-400/5 border-b border-gold-400/10 px-6 py-3 flex items-center justify-between animate-slide-up-fade">
-               <div className="flex items-center gap-3">
-                  <Mail className="w-4 h-4 text-gold-400" />
-                  <p className="text-[10px] font-bold text-white uppercase tracking-widest">
-                     Please verify your email address
-                  </p>
-               </div>
-               <button onClick={() => window.location.reload()} className="text-[9px] font-bold text-navy-500 uppercase tracking-widest hover:text-white transition-colors">
-                  I&apos;ve Verified
-               </button>
+        {/* Email verification banner */}
+        {user && !user.email_confirmed_at && (
+          <div className="bg-gold-400/5 border-b border-gold-400/10 px-6 py-3 flex items-center justify-between animate-slide-up-fade" role="alert">
+            <div className="flex items-center gap-3">
+              <Mail className="w-4 h-4 text-gold-400" aria-hidden="true" />
+              <p className="text-[10px] font-bold text-white uppercase tracking-widest">Please verify your email address</p>
             </div>
-          )}
+            <button onClick={() => window.location.reload()} className="text-[9px] font-bold text-navy-500 uppercase tracking-widest hover:text-white transition-colors">
+              I've Verified
+            </button>
+          </div>
+        )}
+
+        {/* Page content */}
+        <main className="flex-1 overflow-y-auto pb-24 lg:pb-0 scroll-smooth" id="main-content" tabIndex={-1}>
           <Outlet />
         </main>
       </div>
 
-      {/* Minimal Mobile Bottom Nav */}
-      <nav className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-navy-950/90 backdrop-blur-2xl border-t border-white/5 px-4 py-2 pb-[calc(env(safe-area-inset-bottom)+8px)]">
-        <div className={`flex items-center justify-around gap-1`}>
-          {visibleNavItems.slice(0, 5).map((item) => {
+      {/* ── Mobile Bottom Nav ── */}
+      <nav className={`lg:hidden fixed bottom-0 inset-x-0 z-40 border-t px-2 py-2 pb-[calc(env(safe-area-inset-bottom)+8px)] transition-colors duration-300 ${isDark ? 'bg-navy-950/95 border-white/5 backdrop-blur-2xl' : 'bg-white/95 border-slate-200 backdrop-blur-2xl'}`}
+        role="navigation" aria-label="Mobile navigation">
+        <div className="flex items-center justify-around gap-1">
+          {mobileNavItems.map((item) => {
             const Icon = item.icon;
             const active = isActive(item.path);
             return (
-              <Link
-                key={item.path}
-                to={item.path}
-                className={`flex flex-col items-center justify-center rounded-xl py-2 flex-1 transition-all ${
-                  active ? 'text-gold-400 bg-white/5' : 'text-navy-500'
-                }`}
-              >
-                <Icon className={`w-5 h-5 mb-1 ${active ? 'scale-110' : ''}`} />
+              <Link key={item.path} to={item.path}
+                className={`flex flex-col items-center justify-center rounded-xl py-2 flex-1 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-400 ${active ? (isDark ? 'text-gold-400 bg-white/5' : 'text-gold-600 bg-gold-50') : (isDark ? 'text-navy-500' : 'text-slate-400')}`}
+                aria-current={active ? 'page' : undefined}
+                aria-label={item.label}>
+                <Icon className={`w-5 h-5 mb-1 transition-transform ${active ? 'scale-110' : ''}`} aria-hidden="true" />
                 <span className="text-[8px] font-bold uppercase tracking-wider">{item.label}</span>
               </Link>
             );

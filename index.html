@@ -2,29 +2,52 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link
-      rel="icon"
-      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ctext y='50' font-size='50'%3E%F0%9F%93%96%3C/text%3E%3C/svg%3E"
-    />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+
+    <!-- Favicon -->
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23fbbf24'/%3E%3Ctext y='48' x='10' font-size='44' fill='%230f1923'%3E✝%3C/text%3E%3C/svg%3E" />
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#fbbf24" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="BibleAI" />
+    <link rel="apple-touch-icon" href="/icon-192.png" />
+
+    <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-    <title>BibleAI - Your AI Bible Companion</title>
-    <meta name="description" content="Chat with the Bible, track your prayers and grow your faith with AI" />
-    <link rel="canonical" href="https://example.com/" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+
+    <!-- Default SEO (overridden by SeoMeta component at runtime) -->
+    <title>BibleAI — AI-Powered Scripture & Prayer</title>
+    <meta name="description" content="Chat with the Bible, track your prayers, and grow your faith with AI-powered insights. Join thousands of believers." />
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="BibleAI - Your AI Bible Companion" />
-    <meta property="og:description" content="Chat with the Bible, track your prayers and grow your faith with AI" />
-    <meta property="og:url" content="https://example.com/" />
-    <meta property="og:image" content="https://bolt.new/static/og_default.png" />
+    <meta property="og:title" content="BibleAI — AI-Powered Scripture & Prayer" />
+    <meta property="og:description" content="Chat with the Bible, track your prayers, and grow your faith with AI-powered insights." />
+    <meta property="og:url" content="https://bible-ai-initial-build.vercel.app/" />
+    <meta property="og:image" content="https://bible-ai-initial-build.vercel.app/og-default.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:site_name" content="BibleAI" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="BibleAI - Your AI Bible Companion" />
-    <meta name="twitter:description" content="Chat with the Bible, track your prayers and grow your faith with AI" />
-    <meta name="twitter:image" content="https://bolt.new/static/og_default.png" />
+    <meta name="twitter:title" content="BibleAI — AI-Powered Scripture & Prayer" />
+    <meta name="twitter:description" content="Chat with the Bible, track your prayers, and grow your faith with AI." />
+    <meta name="twitter:image" content="https://bible-ai-initial-build.vercel.app/og-default.png" />
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <!-- Register Service Worker -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js', { scope: '/' })
+            .then((reg) => console.log('[SW] Registered:', reg.scope))
+            .catch((err) => console.warn('[SW] Registration failed:', err));
+        });
+      }
+    </script>
   </body>
 </html>

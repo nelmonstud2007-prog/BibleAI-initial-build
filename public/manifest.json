@@ -1,0 +1,45 @@
+{
+  "name": "BibleAI — Scripture & Prayer",
+  "short_name": "BibleAI",
+  "description": "AI-powered Bible study, prayer journal, and daily devotionals",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#0f1923",
+  "theme_color": "#fbbf24",
+  "orientation": "portrait-primary",
+  "icons": [
+    { "src": "/icon-72.png",  "sizes": "72x72",   "type": "image/png" },
+    { "src": "/icon-96.png",  "sizes": "96x96",   "type": "image/png" },
+    { "src": "/icon-128.png", "sizes": "128x128", "type": "image/png" },
+    { "src": "/icon-144.png", "sizes": "144x144", "type": "image/png" },
+    { "src": "/icon-152.png", "sizes": "152x152", "type": "image/png" },
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icon-384.png", "sizes": "384x384", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ],
+  "categories": ["lifestyle", "education", "religion"],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Daily Verse",
+      "short_name": "Verse",
+      "description": "Read today's verse",
+      "url": "/dashboard/daily-verse",
+      "icons": [{ "src": "/icon-96.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Prayer Journal",
+      "short_name": "Prayer",
+      "description": "Write a prayer",
+      "url": "/dashboard/prayer-journal",
+      "icons": [{ "src": "/icon-96.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Bible Chat",
+      "short_name": "Chat",
+      "description": "Ask the AI about scripture",
+      "url": "/dashboard/bible-chat",
+      "icons": [{ "src": "/icon-96.png", "sizes": "96x96" }]
+    }
+  ]
+}
